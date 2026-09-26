@@ -250,6 +250,50 @@
       return org;
     },
 
+    /* Sets a NEW password for an organisation and returns it once. No
+       existing password is ever read — they are one-way hashes. The server
+       checks this account is the platform owner before doing anything. */
+    async setOrgPassword(org_id, password) {
+      const pw = String(password || "");
+      if (pw.length < 8) throw new Error("Use at least 8 characters.");
+      if (pw.length > 72) throw new Error("That's too long — 72 characters at most.");
+
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) throw new Error("Your sign-in expired. Reload the page and sign in again.");
+
+      let res;
+      try {
+        res = await fetch(`${GEK.url}/functions/v1/admin-reset-password`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: GEK.key,
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ org_id, password: pw })
+        });
+      } catch (e) {
+        /* the request never left the browser at all */
+        throw new Error("Couldn't reach the server. Check your connection and try again.");
+      }
+
+      let out = {};
+      try { out = await res.json(); } catch (e) { /* nothing readable came back */ }
+
+      if (!res.ok || !out.ok) {
+        const why = {
+          NOT_ALLOWED: "Only the platform owner can change a password. Sign out and back in as rianshah.",
+          NOT_CONFIGURED: "Password changes aren't switched on for this site yet.",
+          NO_SUCH_ORG: "That organisation has no owner account to change.",
+          TOO_SHORT: "Use at least 8 characters.",
+          TOO_LONG: "That's too long — 72 characters at most.",
+          COULD_NOT_SET: out.detail || "The server refused that password."
+        }[out.error];
+        throw new Error(why || `The password couldn't be changed (${res.status}).`);
+      }
+      return out;
+    },
+
     async stopViewing() {
       const was = watching;
       watching = null;

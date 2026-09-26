@@ -474,7 +474,57 @@
     }
   }
 
+
+  /* One event card, used by the listing and by the homepage strip, so the two
+     can never drift apart. The poster is shown whole on a blurred, enlarged
+     copy of itself — any shape of artwork then looks deliberate. */
+  function eventCard(e) {
+    const left = e.capacity ? e.capacity - e.sold : null;
+    const scarce = left !== null && left > 0 && left <= 20;
+    const poster = safeImage(e.image);
+    const gone = e.capacity ? Math.min(100, Math.round((e.sold / e.capacity) * 100)) : 0;
+
+    const art = poster
+      ? `<div class="ev-art">
+           <div class="ev-art-bg" style="background-image:url('${poster.replace(/'/g, "%27")}')"></div>
+           <img src="${poster}" alt="Poster for ${esc(e.name)}" loading="lazy">`
+      : `<div class="ev-art is-ph" style="background:${tint(e.name)}">
+           <span class="ph">${esc(initials(e.name))}</span>`;
+
+    return `
+      <a class="ev-card" href="event.html?e=${encodeURIComponent(e.slug)}">
+        ${art}
+          <div class="ev-date">
+            <div class="d">${dayNum(e.date)}</div>
+            <div class="m">${monthShort(e.date)}</div>
+          </div>
+          <span class="ev-tag${scarce ? " hot" : ""}">${scarce ? `${left} left` : esc(e.category)}</span>
+        </div>
+        <div class="ev-body">
+          <div class="ev-org">${esc(e.org.name)}</div>
+          <h3>${esc(e.name)}</h3>
+          <div class="ev-meta">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+            ${esc(e.venue)}, ${esc(e.city)}
+          </div>
+          <div class="ev-meta">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
+            ${esc(prettyTime(e.start_time))}
+          </div>
+          <div class="ev-foot">
+            ${e.sold_out
+              ? `<span class="badge bad">Sold out</span>`
+              : `<div class="ev-price"><small>${e.current ? esc(e.current.name) : "From"}</small>${esc(money(e.current ? e.current.price : e.from_price, e.currency))}</div>`}
+            ${e.sold_out ? "" : e.capacity ? `<div class="ev-left">
+              ${gone >= 60 ? `<b>${gone}% gone</b>` : `${e.sold} going`}
+              <span class="ev-bar${scarce ? " low" : ""}"><span style="width:${Math.max(3, gone)}%"></span></span>
+            </div>` : ""}
+          </div>
+        </div>
+      </a>`;
+  }
+
   window.UI = { $, $$, esc, money, amount, inkOn, prettyDate, shortDate, prettyTime, when, ago,
-                dayNum, monthShort, toast, qs, initials, tint, header, footer, drawQR, LOGO,
+                dayNum, monthShort, toast, qs, initials, tint, header, footer, drawQR, LOGO, eventCard,
                 readImage, safeImage, upload, uploadBox, dataUrlToBlob, confetti, animate, stagger, motionOK };
 })();

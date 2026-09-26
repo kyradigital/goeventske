@@ -36,6 +36,8 @@
     const grid = $("#grid");
 
     if (!rows.length) {
+      const c0 = $("#count");
+      if (c0) c0.textContent = "";
       grid.innerHTML = `
         <div class="empty">
           <h3>Nothing matches that</h3>
@@ -45,41 +47,11 @@
       return;
     }
 
-    grid.innerHTML = `<div class="ev-grid">${rows.map(card).join("")}</div>`;
+    grid.innerHTML = `<div class="ev-grid">${rows.map(UI.eventCard).join("")}</div>`;
+    const c = $("#count");
+    if (c) c.textContent = rows.length === 1 ? "1 event" : `${rows.length} events`;
     UI.stagger("#grid .ev-grid", 55);
     UI.animate(grid);
   }
 
-  function card(e) {
-    const left = e.capacity ? e.capacity - e.sold : null;
-    const scarce = left !== null && left > 0 && left <= 20;
-    return `
-      <a class="ev-card" href="event.html?e=${encodeURIComponent(e.slug)}">
-        <div class="ev-img" style="background:${tint(e.name)}">
-          ${UI.safeImage(e.image) ? `<img src="${UI.safeImage(e.image)}" alt="">` : `<span class="ph">${esc(initials(e.name))}</span>`}
-          <div class="ev-date">
-            <div class="d">${dayNum(e.date)}</div>
-            <div class="m">${monthShort(e.date)}</div>
-          </div>
-        </div>
-        <div class="ev-body">
-          <div class="ev-org">${esc(e.org.name)}</div>
-          <h3>${esc(e.name)}</h3>
-          <div class="ev-meta">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
-            ${esc(e.venue)}, ${esc(e.city)}
-          </div>
-          <div class="ev-meta">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
-            ${esc(prettyTime(e.start_time))}
-          </div>
-          <div class="ev-foot">
-            ${e.sold_out
-              ? `<span class="badge bad">Sold out</span>`
-              : `<div class="ev-price"><small>${e.current ? esc(e.current.name) : "From"}</small>${esc(money(e.current ? e.current.price : e.from_price, e.currency))}</div>`}
-            ${scarce ? `<span class="badge warn">${left} left</span>` : `<span class="badge live">${esc(e.category)}</span>`}
-          </div>
-        </div>
-      </a>`;
-  }
 })();

@@ -104,8 +104,22 @@
       <div><div class="n" data-count>10%</div><div class="l">per ticket sold — that is the whole bill</div></div>
       <div><div class="n" data-count>10 min</div><div class="l">from signing up to your first sale</div></div>
       <div><div class="n" data-count>24 hrs</div><div class="l">after the event, the money lands</div></div>
-      <div><div class="n">M-Pesa</div><div class="l">they pay with the phone in their hand</div></div>
+      <div><div class="n">M-Pesa</div><div class="l">or card — they pay however they like</div></div>
     </div>
+  </div>
+</section>
+
+<!-- ============ what's on right now ============ -->
+<section class="live-strip" id="liveStrip" hidden>
+  <div class="wrap">
+    <div class="strip-head">
+      <div>
+        <span class="live-now">On sale now</span>
+        <h2 class="title">What's on</h2>
+      </div>
+      <a class="btn btn-soft" href="discover.html">See every event</a>
+    </div>
+    <div id="liveGrid"></div>
   </div>
 </section>
 
@@ -194,10 +208,10 @@
 
       <div class="card">
         <div class="ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2.5h10a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 20V4A1.5 1.5 0 0 1 7 2.5z"/><path d="M10.5 18.5h3"/><path d="M9 8.5h6M9 11.5h4"/></svg></div>
-        <h3>M-Pesa in, M-Pesa out</h3>
-        <p>Buyers get an STK push and enter their PIN on their own handset — never on our site, never to
-           a person. You do not need a Daraja account or a paybill of your own. Your share goes to your
-           M-Pesa number 24 hours after the event, in one clean payment.</p>
+        <h3>M-Pesa or card, one checkout</h3>
+        <p>Buyers pay however they like — M-Pesa, Airtel Money, Visa or Mastercard — on the payment
+           provider's own secure page. No PIN and no card number ever touches this site, and you need no
+           paybill of your own. Your share lands 24 hours after the event, in one clean payment.</p>
       </div>
 
     </div>
@@ -314,6 +328,21 @@
   /* the four steps, the six feature cards and the stats arrive one by one */
   UI.stagger(".steps, .cards, .stats-strip", 80);
   UI.animate();
+
+  /* A landing page full of promises is less convincing than four real events.
+     If there are none yet, or the database cannot be reached, the strip simply
+     never appears — the rest of the page does not depend on it. */
+  (async function liveStrip() {
+    try {
+      const rows = (await PL.publicEvents({})).slice(0, 4);
+      if (!rows.length) return;
+      document.getElementById("liveGrid").innerHTML =
+        `<div class="ev-grid">${rows.map(UI.eventCard).join("")}</div>`;
+      document.getElementById("liveStrip").hidden = false;
+      UI.stagger("#liveGrid .ev-grid", 60);
+      UI.animate(document.getElementById("liveStrip"));
+    } catch (e) { /* nothing on sale, or offline: leave the strip out */ }
+  })();
 </script>
 </body>
 </html>

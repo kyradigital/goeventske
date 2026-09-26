@@ -3,6 +3,9 @@
    ============================================================ */
 (async function () {
   const { $, $$, esc, money, amount, when, prettyTime, initials, tint, toast, qs } = UI;
+
+  const TICK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5L20 6.5"/></svg>';
+
   UI.header();
   UI.footer();
 
@@ -32,10 +35,11 @@
       <div class="ev-cols" id="cols">
         <div>
           ${UI.safeImage(ev.image)
-            ? `<div class="ev-img ev-hero">
+            ? `<div class="ev-hero">
+                 <div class="ev-art-bg" style="background-image:url('${UI.safeImage(ev.image).replace(/'/g, "%27")}')"></div>
                  <img src="${UI.safeImage(ev.image)}" alt="Poster for ${esc(ev.name)}">
                </div>`
-            : `<div class="ev-img ev-hero is-ph" style="background:${tint(ev.name)}">
+            : `<div class="ev-hero is-ph" style="background:${tint(ev.name)}">
                  <span class="ph ph-lg">${esc(initials(ev.name))}</span>
                </div>`}
 
@@ -72,7 +76,7 @@
           </div>` : ""}
         </div>
 
-        <div class="panel" id="buyBox" style="position:sticky;top:90px"></div>
+        <div class="panel buy-panel" id="buyBox" style="position:sticky;top:90px"></div>
       </div>
 
       <div class="buy-bar" id="buyBar" hidden>
@@ -142,14 +146,39 @@
       return;
     }
 
-    box.innerHTML = `
-      <h3 style="margin-bottom:16px">Get your tickets</h3>
-      ${onSale.map(ticketRow).join("")}
-      <div class="total-line"><span class="muted">Total</span><b id="total">${amount(0, ev.currency)}</b></div>
-      <button class="btn btn-primary btn-block" id="buyBtn" disabled>Select tickets</button>
-      <p class="tiny muted center" style="margin:12px 0 0">Your QR ticket is emailed the moment your payment clears.</p>`;
+    const count = Object.values(cart).reduce((a, b) => a + b, 0);
+    const total = cartTotal();
 
-    $$("#buyBox [data-step]").forEach((b) => (b.onclick = () => step(b.dataset.tt, Number(b.dataset.step))));
+    box.innerHTML = `
+      <div class="buy-top">
+        <h3>Get your tickets</h3>
+        <div class="from">${esc(fromLine())}${ev.from_price ? " · pay with card or M-Pesa" : ""}</div>
+      </div>
+      <div class="buy-list">${onSale.map(ticketRow).join("")}</div>
+      <div class="buy-foot">
+        <div class="total-line">
+          <span class="lbl">Total${count ? `<small>${count} ticket${count > 1 ? "s" : ""}</small>` : "<small>nothing chosen yet</small>"}</span>
+          <b id="total">${amount(total, ev.currency)}</b>
+        </div>
+        <button class="btn btn-primary btn-block btn-lg" id="buyBtn" ${count ? "" : "disabled"}>${esc(buyLabel())}</button>
+        <div class="buy-trust">
+          <span>${TICK} QR ticket by email, instantly</span>
+          <span>${TICK} Card or M-Pesa</span>
+          <span>${TICK} Payment handled by Paystack</span>
+        </div>
+      </div>`;
+
+    /* the whole stub is the target — tapping a small + on a phone is fiddly */
+    $$("#buyBox .tt").forEach((row) => {
+      row.onclick = (e) => {
+        if (e.target.closest("[data-step]")) return;
+        if (row.classList.contains("sold")) return;
+        step(row.dataset.id, 1);
+      };
+    });
+    $$("#buyBox [data-step]").forEach((b) => (b.onclick = (e) => {
+      e.stopPropagation(); step(b.dataset.tt, Number(b.dataset.step));
+    }));
     $("#buyBtn").onclick = openCheckout;
   }
 
@@ -157,25 +186,37 @@
     const left = t.quantity === 0 ? Infinity : t.quantity - t.sold;
     const gone = left <= 0;
     const n = cart[t.id] || 0;
+    const free = t.price === 0;
     return `
-      <div class="tt ${gone ? "sold" : ""}">
+      <div class="tt ${gone ? "sold" : ""}${n ? " picked" : ""}" data-id="${t.id}">
         <div class="tt-top">
           <div style="min-width:0">
             <h4>${esc(t.name)}</h4>
             ${t.blurb ? `<div class="small muted">${esc(t.blurb)}</div>` : ""}
-            <div style="font-weight:700;margin-top:6px">${esc(money(t.price, ev.currency))}</div>
+            <div class="tt-price${free ? " free" : ""}">${free ? "Free" : esc(money(t.price, ev.currency))}</div>
             ${left !== Infinity && left > 0 && left <= 20
-              ? `<div class="tiny" style="color:var(--amber);font-weight:600;margin-top:3px">Only ${left} left</div>` : ""}
+              ? `<div class="tt-left">Only ${left} left</div>` : ""}
           </div>
           ${gone
             ? `<span class="badge bad">Gone</span>`
-            : `<div class="qty">
-                 <button data-tt="${t.id}" data-step="-1" aria-label="one fewer">−</button>
-                 <b>${n}</b>
-                 <button data-tt="${t.id}" data-step="1" aria-label="one more">+</button>
-               </div>`}
+            : n
+              ? `<div class="qty">
+                   <button data-tt="${t.id}" data-step="-1" aria-label="one fewer ${esc(t.name)}">−</button>
+                   <b>${n}</b>
+                   <button data-tt="${t.id}" data-step="1" aria-label="one more ${esc(t.name)}"
+                     ${n >= Math.min(10, left) ? "disabled" : ""}>+</button>
+                 </div>`
+              : `<button class="tt-add" data-tt="${t.id}" data-step="1">Add</button>`}
         </div>
       </div>`;
+  }
+
+  function buyLabel() {
+    const count = Object.values(cart).reduce((a, b) => a + b, 0);
+    const total = cartTotal();
+    if (!count) return "Choose your tickets";
+    if (total === 0) return `Get ${count} free ticket${count > 1 ? "s" : ""}`;
+    return `Buy ${count} ticket${count > 1 ? "s" : ""} · ${amount(total, ev.currency)}`;
   }
 
   function step(id, by) {
@@ -183,24 +224,38 @@
     const left = t.quantity === 0 ? Infinity : t.quantity - t.sold;
     const next = Math.max(0, Math.min(10, (cart[id] || 0) + by));
     if (next > left) return toast(`Only ${left} of those left.`, "err");
+    if (next === (cart[id] || 0)) return;
     cart[id] = next;
     if (!next) delete cart[id];
+
     paintBuy();
-    const total = cartTotal();
-    $("#total").textContent = amount(total, ev.currency);
-    const btn = $("#buyBtn");
-    const count = Object.values(cart).reduce((a, b) => a + b, 0);
-    btn.disabled = !count;
-    btn.textContent = !count ? "Select tickets"
-      : total === 0 ? `Get ${count} free ticket${count > 1 ? "s" : ""}`
-      : `Buy ${count} ticket${count > 1 ? "s" : ""} · ${amount(total, ev.currency)}`;
+
+    /* a small nudge on the total, so the change is felt and not just seen */
+    const tot = $("#total");
+    if (tot) { tot.classList.remove("bump"); void tot.offsetWidth; tot.classList.add("bump"); }
+    paintBuyBar();
   }
 
-  const cartTotal = () =>
-    Object.entries(cart).reduce((n, [id, q]) => {
+  /* the phone bar carries the same numbers as the panel */
+  function paintBuyBar() {
+    const bar = $("#buyBar");
+    if (!bar) return;
+    const count = Object.values(cart).reduce((a, b) => a + b, 0);
+    const price = $(".bb-price", bar);
+    const go = $("#bbGo");
+    if (price) price.innerHTML = count
+      ? `<b>${esc(amount(cartTotal(), ev.currency))}</b><small>${count} ticket${count > 1 ? "s" : ""}</small>`
+      : esc(fromLine());
+    if (go && !ev.sold_out) go.textContent = count ? "Checkout" : "Get tickets";
+  }
+
+  /* a declaration, not a const: paintBuy runs before this point in the file */
+  function cartTotal() {
+    return Object.entries(cart).reduce((n, [id, q]) => {
       const t = ev.ticket_types.find((x) => x.id === id);
       return n + (t ? t.price * q : 0);
     }, 0);
+  }
 
   /* ---------- checkout ----------
      Three steps, one modal: who you are, prove the inbox is yours, then pay.
@@ -210,15 +265,25 @@
     const total = cartTotal();
     const lines = Object.entries(cart).map(([id, q]) => {
       const t = ev.ticket_types.find((x) => x.id === id);
-      return `<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0">
-        <span>${esc(t.name)} × ${q}</span><b>${esc(amount(t.price * q, ev.currency))}</b></div>`;
+      return `<div class="ck-line">
+        <span><i>${q}×</i> ${esc(t.name)}</span><b>${esc(amount(t.price * q, ev.currency))}</b></div>`;
     }).join("");
 
+    /* the order, shown as the thing they are buying rather than a table */
     const summary = `
-      <div class="panel" style="box-shadow:none;background:var(--bg-2);padding:16px;margin-bottom:20px">
-        <div style="font-weight:700;margin-bottom:8px">${esc(ev.name)}</div>
-        ${lines}
-        <div class="total-line" style="padding:12px 0 0"><span class="muted">Total</span><b>${esc(amount(total, ev.currency))}</b></div>
+      <div class="ck-order">
+        <div class="ck-order-top">
+          <div class="ck-when">
+            <div class="d">${UI.dayNum(ev.date)}</div>
+            <div class="m">${UI.monthShort(ev.date)}</div>
+          </div>
+          <div style="min-width:0">
+            <div class="ck-ev">${esc(ev.name)}</div>
+            <div class="ck-where">${esc(ev.venue)}, ${esc(ev.city)} · ${esc(prettyTime(ev.start_time))}</div>
+          </div>
+        </div>
+        <div class="ck-lines">${lines}</div>
+        <div class="ck-total"><span>Total</span><b>${esc(amount(total, ev.currency))}</b></div>
       </div>`;
 
     $("#modalHost").innerHTML = `
@@ -227,7 +292,7 @@
           <div class="modal-head">
             <div>
               <h3 id="ckTitle">Your details</h3>
-              <div class="steps-dots" id="ckDots"><i class="on"></i><i></i></div>
+              <div class="ck-steps" id="ckDots"></div>
             </div>
             <button class="x" data-close>&times;</button>
           </div>
@@ -243,8 +308,11 @@
     let buyer = { name: "", email: "" };
     let proof = null;
 
-    const dots = (n) => ($("#ckDots").innerHTML =
-      [0, 1].map((i) => `<i class="${i < n ? "on" : ""}"></i>`).join(""));
+    /* naming the steps makes a three-part process feel short rather than vague */
+    const STEPS = ["Details", "Verify", "Pay"];
+    const dots = (n) => ($("#ckDots").innerHTML = STEPS.map((label, i) =>
+      `<span class="ck-step ${i < n - 1 ? "done" : i === n - 1 ? "now" : ""}">
+         <i>${i < n - 1 ? TICK : i + 1}</i>${label}</span>`).join(""));
 
     /* ---------- step one: who is buying ---------- */
     function stepDetails(msg) {
@@ -258,12 +326,12 @@
           <input id="bEmail" type="email" value="${esc(buyer.email)}" placeholder="you@example.com"
                  autocomplete="email" inputmode="email"></div>
         <p class="tiny muted" style="margin:0 0 4px">
-          We'll send a one-time code to this address to verify your purchase. Your ticket is emailed here too,
-          so do check it's right.</p>
+          Your ticket lands in this inbox, so check it twice. We'll send a six-digit code there
+          first to make sure it's yours.</p>
         ${msg ? `<p class="tiny" style="color:var(--red);margin:10px 0 0">${esc(msg)}</p>` : ""}`;
       $("#ckFoot").innerHTML = `
         <button class="btn btn-soft" data-close>Cancel</button>
-        <button class="btn btn-primary" id="ckGo">Proceed</button>`;
+        <button class="btn btn-primary" id="ckGo">Send me the code</button>`;
       $$("[data-close]").forEach((b) => (b.onclick = close));
       $("#bName").focus();
       $("#bEmail").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#ckGo").click(); });
@@ -303,11 +371,11 @@
           <input id="bCode" class="otp-input" inputmode="numeric" autocomplete="one-time-code"
                  maxlength="6" placeholder="000000"></div>
         <p class="tiny muted" style="margin:0">
-          It expires in 10 minutes. Can't see it? Check your spam folder.</p>
+          It expires in 10 minutes. Nothing is charged until you've entered it.</p>
         ${msg ? `<p class="tiny" style="color:var(--red);margin:10px 0 0">${esc(msg)}</p>` : ""}`;
       $("#ckFoot").innerHTML = `
         <button class="btn btn-soft" id="ckBack">Back</button>
-        <button class="btn btn-primary" id="ckConfirm">Confirm and pay</button>`;
+        <button class="btn btn-primary" id="ckConfirm">Confirm and pay ${esc(amount(total, ev.currency))}</button>`;
       $("#ckBack").onclick = () => stepDetails();
       $("#ckConfirm").onclick = confirmCode;
 

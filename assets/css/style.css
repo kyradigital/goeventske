@@ -79,6 +79,11 @@ img{max-width:100%;display:block}
 }
 .btn:active{transform:translateY(1px)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
+/* a faded orange reads as a broken button; an off button should look off */
+.btn-primary:disabled{
+  background:var(--card-2);color:var(--faint);box-shadow:none;opacity:1;
+  border:1px solid var(--line);
+}
 /* The main action is white on black — the sharpest thing on the page, and it keeps
    red and green free to mean something. */
 .btn-primary{background:var(--orange);color:var(--on-orange);box-shadow:var(--glow)}
@@ -300,30 +305,236 @@ h2.title{font-size:clamp(1.85rem,3.4vw,2.7rem);margin-bottom:16px}
 }
 .secret{cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--muted)}
 
-/* ---------- event cards ---------- */
-.ev-grid{display:grid;gap:22px;grid-template-columns:repeat(auto-fill,minmax(285px,1fr))}
+/* ---------- what's on, on the homepage ----------
+   Four real events beat four more paragraphs of promises. */
+.live-strip{padding:72px 0;background:var(--bg-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.strip-head{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  flex-wrap:wrap;margin-bottom:30px;
+}
+.strip-head .title{font-size:clamp(1.8rem,3.4vw,2.5rem);letter-spacing:-.03em;margin:0}
+.live-strip .live-now{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--orange-ink);margin-bottom:10px;
+}
+.live-strip .live-now::before{
+  content:"";width:7px;height:7px;border-radius:50%;background:var(--orange);
+  box-shadow:0 0 0 0 rgba(242,106,27,.6);animation:livePulse 2.6s ease-out infinite;
+}
+.live-strip .ev-card{background:var(--card)}
+/* four across on a wide screen, so the row is never left with one orphan */
+@media(min-width:1120px){ .live-strip .ev-grid{grid-template-columns:repeat(4,minmax(0,1fr))} }
+@media (prefers-reduced-motion:reduce){ .live-strip .live-now::before{animation:none} }
+@media(max-width:640px){ .live-strip{padding:44px 0} .strip-head{margin-bottom:20px} }
+
+/* ---------- the browse page ----------
+
+   The listing is what people come for, so it opens on a dark band: it
+   separates the site's chrome from the events, and posters read better
+   against something dark than against more white. */
+.browse-top{
+  position:relative;overflow:hidden;
+  background:var(--ink);color:#fff;
+  padding:58px 0 66px;
+}
+/* a slow, very low-contrast wash — depth without a loud gradient */
+.browse-top::before{
+  content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(760px 420px at 12% -10%, rgba(242,106,27,.20), transparent 62%),
+    radial-gradient(620px 380px at 88% 116%, rgba(15,122,58,.16), transparent 60%);
+  pointer-events:none;
+}
+.browse-top .wrap{position:relative}
+.browse-top .live-now{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(255,255,255,.66);margin-bottom:16px;
+}
+.browse-top .live-now::before{
+  content:"";width:7px;height:7px;border-radius:50%;background:var(--orange);
+  box-shadow:0 0 0 0 rgba(242,106,27,.6);animation:livePulse 2.6s ease-out infinite;
+}
+@keyframes livePulse{
+  0%{box-shadow:0 0 0 0 rgba(242,106,27,.6)}
+  70%{box-shadow:0 0 0 8px rgba(242,106,27,0)}
+  100%{box-shadow:0 0 0 0 rgba(242,106,27,0)}
+}
+.browse-title{
+  font-family:var(--display);font-weight:800;
+  font-size:clamp(2.5rem,6vw,4.2rem);line-height:1.02;letter-spacing:-.035em;
+  margin:0 0 14px;color:#fff;
+}
+.browse-title .dot{color:var(--orange)}
+.browse-sub{
+  color:rgba(255,255,255,.72);font-size:1.02rem;line-height:1.6;
+  max-width:52ch;margin:0 0 28px;
+}
+.search-bar.big{
+  max-width:520px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.16);border-radius:14px;
+  padding:14px 17px;color:#fff;
+  backdrop-filter:blur(10px);
+  transition:border-color .2s, background .2s, box-shadow .2s;
+}
+.search-bar.big:focus-within{
+  background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.34);
+  box-shadow:0 0 0 4px rgba(242,106,27,.22);
+}
+.search-bar.big svg{color:rgba(255,255,255,.6)}
+.search-bar.big input{color:#fff;font-size:1rem}
+.search-bar.big input::placeholder{color:rgba(255,255,255,.52)}
+
+/* the filter strip, which follows you down */
+.filter-bar{
+  position:sticky;top:0;z-index:60;
+  background:rgba(255,255,255,.88);backdrop-filter:blur(14px) saturate(1.5);
+  border-bottom:1px solid var(--line);
+}
+.filter-row{
+  display:flex;align-items:center;gap:16px;
+  padding:13px 0;
+}
+.filter-bar .chip-row{
+  margin:0;flex:1;flex-wrap:nowrap;overflow-x:auto;
+  scrollbar-width:none;-ms-overflow-style:none;
+}
+.filter-bar .chip-row::-webkit-scrollbar{display:none}
+.filter-bar .chip{flex:none}
+.result-count{
+  flex:none;font-size:.82rem;font-weight:600;color:var(--faint);
+  letter-spacing:.02em;font-variant-numeric:tabular-nums;
+}
+.browse-page{padding:30px 0 90px}
+/* the chips scroll under the count on a narrow screen, so fade the edge
+   and drop the count where there is no room for it */
+.filter-bar .chip-row{
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);
+  mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);
+}
+@media(max-width:620px){
+  .result-count{display:none}
+  .filter-row{padding:10px 0}
+  .browse-top{padding:28px 0 30px}
+  .browse-title{font-size:2.15rem;margin-bottom:8px}
+  .browse-sub{font-size:.9rem;line-height:1.5;margin-bottom:16px}
+  .browse-top .live-now{margin-bottom:10px;font-size:.66rem}
+  /* a search box the size of a search box, not a hero panel */
+  .search-bar.big{max-width:none;padding:10px 13px;border-radius:11px}
+  .search-bar.big input{font-size:16px}
+  .search-bar.big svg{width:15px;height:15px}
+  /* the chips were touching: give them room and a little runway either end */
+  .filter-bar .chip-row{gap:8px;padding:2px 16px 2px 0;margin-left:-2px}
+  .filter-bar .chip{padding:8px 14px;font-size:.84rem}
+}
+
+/* something to look at while the events load */
+.grid-skeleton{display:grid;gap:24px;grid-template-columns:repeat(auto-fill,minmax(278px,1fr))}
+.grid-skeleton i{
+  display:block;height:368px;border-radius:var(--radius);
+  background:linear-gradient(100deg,var(--card-2) 30%,#efe9e4 45%,var(--card-2) 60%);
+  background-size:280% 100%;animation:shimmer 1.5s linear infinite;
+}
+@keyframes shimmer{to{background-position:-180% 0}}
+@media (prefers-reduced-motion:reduce){
+  .grid-skeleton i{animation:none}
+  .browse-top .live-now::before{animation:none}
+}
+
+/* ---------- event cards ----------
+
+   A poster is artwork. Cropping it to a fixed square cut the artist's name
+   off half the flyers on this site, so the whole poster is shown, sitting on
+   a blurred, enlarged copy of itself — the trick record shops and streaming
+   apps use, because it means any shape of art looks deliberate rather than
+   stranded in a grey box. The art block is kept short so the card stays a
+   card: the poster invites, the words underneath do the work. */
+.ev-grid{display:grid;gap:24px;grid-template-columns:repeat(auto-fill,minmax(278px,1fr))}
 .ev-card{
+  position:relative;
   background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
   text-decoration:none;color:inherit;display:flex;flex-direction:column;
-  transition:transform .18s ease, border-color .18s ease;
+  box-shadow:0 1px 2px rgba(23,23,27,.05);
+  transition:transform .26s cubic-bezier(.22,.8,.3,1), box-shadow .26s, border-color .2s;
 }
-.ev-card:hover{transform:translateY(-4px);border-color:var(--line-2)}
-.ev-img{aspect-ratio:1/1;background:var(--card-2);position:relative;display:grid;place-items:center;overflow:hidden}
-.ev-img img{width:100%;height:100%;object-fit:cover}
-.ev-img .ph{font-family:var(--display);font-weight:800;font-size:2.6rem;color:#fff;text-shadow:0 2px 16px rgba(23,23,27,.45)}
+.ev-card:hover{border-color:var(--line-2)}
+
+/* the artwork block */
+.ev-art{
+  position:relative;height:196px;overflow:hidden;
+  display:grid;place-items:center;isolation:isolate;
+  background:var(--card-2);
+}
+.ev-art-bg{
+  position:absolute;inset:-28px;z-index:0;
+  background-size:cover;background-position:center;
+  filter:blur(26px) saturate(1.5) brightness(.82);
+  transform:scale(1.15);
+  transition:transform .5s cubic-bezier(.22,.8,.3,1);
+}
+.ev-art-bg::after{content:"";position:absolute;inset:0;background:rgba(10,10,14,.22)}
+.ev-art img{
+  position:relative;z-index:1;
+  max-width:78%;max-height:164px;width:auto;height:auto;object-fit:contain;
+  border-radius:8px;
+  box-shadow:0 10px 26px rgba(10,10,14,.34), 0 1px 0 rgba(255,255,255,.22);
+  transition:transform .4s cubic-bezier(.22,.8,.3,1);
+}
+/* no poster: generated art fills the block, as it is meant to */
+.ev-art.is-ph{background-size:cover}
+.ev-art.is-ph .ph{
+  position:relative;z-index:1;
+  font-family:var(--display);font-weight:800;font-size:2.4rem;color:#fff;
+  text-shadow:0 2px 18px rgba(23,23,27,.5);letter-spacing:-.02em;
+}
+
 .ev-date{
-  position:absolute;top:12px;left:12px;background:rgba(0,0,0,.72);backdrop-filter:blur(6px);
-  border:1px solid rgba(255,255,255,.14);border-radius:11px;padding:7px 11px;text-align:center;line-height:1.1;
+  position:absolute;z-index:2;top:12px;left:12px;
+  background:rgba(12,12,16,.62);backdrop-filter:blur(10px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.18);border-radius:12px;
+  padding:6px 11px;text-align:center;line-height:1.05;
+  box-shadow:0 4px 14px rgba(10,10,14,.28);
 }
-.ev-date .d{font-family:var(--display);font-weight:800;font-size:1.05rem;color:#fff}
-.ev-date .m{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:#cfcfd6}
-.ev-body{padding:18px;display:flex;flex-direction:column;gap:7px;flex:1}
-.ev-org{font-size:.78rem;color:var(--orange-ink);font-weight:600}
-.ev-card h3{font-size:1.05rem}
-.ev-meta{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:6px}
-.ev-foot{margin-top:auto;padding-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.ev-price{font-family:var(--display);font-weight:700;color:var(--ink)}
-.ev-price small{display:block;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.ev-date .d{font-family:var(--display);font-weight:800;font-size:1.06rem;color:#fff}
+.ev-date .m{font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;color:rgba(255,255,255,.76);font-weight:600}
+
+/* the category, floated over the art rather than competing below it */
+.ev-tag{
+  position:absolute;z-index:2;top:13px;right:12px;
+  background:rgba(12,12,16,.58);backdrop-filter:blur(10px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.16);border-radius:999px;
+  padding:5px 11px;font-size:.68rem;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:#fff;
+}
+.ev-tag.hot{background:rgba(242,106,27,.92);border-color:rgba(255,255,255,.28)}
+
+.ev-body{padding:16px 17px 17px;display:flex;flex-direction:column;gap:6px;flex:1}
+.ev-org{
+  font-size:.72rem;color:var(--muted);font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;
+}
+.ev-card h3{
+  font-size:1.09rem;line-height:1.25;letter-spacing:-.015em;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.ev-meta{font-size:.845rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.ev-meta svg{flex:none;opacity:.7}
+.ev-foot{
+  margin-top:auto;padding-top:13px;margin-top:13px;border-top:1px solid var(--line);
+  display:flex;align-items:flex-end;justify-content:space-between;gap:10px;
+}
+.ev-price{font-family:var(--display);font-weight:800;color:var(--ink);font-size:1.02rem;letter-spacing:-.01em}
+.ev-price small{
+  display:block;font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint);font-weight:700;margin-bottom:1px;
+}
+/* how close it is to selling out, read at a glance */
+.ev-left{font-size:.76rem;font-weight:700;color:var(--muted);text-align:right;line-height:1.3}
+.ev-left b{display:block;color:var(--orange-ink)}
+.ev-bar{width:56px;height:4px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:5px;margin-left:auto}
+.ev-bar span{display:block;height:100%;border-radius:99px;background:var(--orange)}
+.ev-bar.low span{background:var(--red)}
 
 .chip-row{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:26px}
 .chip{
@@ -464,25 +675,26 @@ tbody tr:hover{background:var(--card-2)}
    capped in height so it stays a poster and not a billboard. The frame
    around it keeps the page tidy whatever shape turns up. */
 .ev-hero{
+  position:relative;isolation:isolate;
   aspect-ratio:auto;
-  width:fit-content;max-width:100%;
+  min-height:300px;
   background:var(--card-2);
-  border:1px solid var(--line);
   border-radius:var(--radius);
-  padding:14px;
-  margin:0 auto 26px 0;          /* hugs the poster, lines up with the title */
+  padding:26px;
+  margin:0 0 26px;
   display:grid;place-items:center;
   overflow:hidden;
 }
 .ev-hero img{
+  position:relative;z-index:1;
   width:auto;height:auto;
-  max-width:100%;max-height:360px;
+  max-width:100%;max-height:340px;
   object-fit:contain;
   border-radius:10px;
-  box-shadow:0 6px 22px rgba(23,23,27,.13);
+  box-shadow:0 18px 44px rgba(10,10,14,.42), 0 1px 0 rgba(255,255,255,.26);
 }
 /* no poster: generated art, which does want a fixed shape */
-.ev-hero.is-ph{aspect-ratio:16/9;width:100%;padding:0;border:none}
+.ev-hero.is-ph{aspect-ratio:16/9;min-height:0;padding:0}
 .ev-chips{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 
 /* the bar that follows a thumb up the page */
@@ -525,13 +737,14 @@ tbody tr:hover{background:var(--card-2)}
 }
 @media(hover:hover){
   .card:hover,.plan:hover{transform:translateY(-4px);box-shadow:var(--shadow);border-color:var(--line-2)}
-  .ev-card:hover{transform:translateY(-5px);box-shadow:var(--shadow-lg)}
-  .ev-card:hover .ev-img img{transform:scale(1.04)}
+  .ev-card:hover{transform:translateY(-6px);box-shadow:0 20px 44px rgba(23,23,27,.15)}
+  .ev-card:hover .ev-art img{transform:scale(1.045) translateY(-2px)}
+  .ev-card:hover .ev-art-bg{transform:scale(1.22)}
   .btn-primary:hover:not(:disabled){transform:translateY(-1px)}
   .side-nav button:hover{transform:translateX(2px)}
   .logo:hover img{transform:scale(1.03)}
 }
-.ev-img img,.logo img{transition:transform .4s cubic-bezier(.22,.8,.3,1)}
+.logo img{transition:transform .4s cubic-bezier(.22,.8,.3,1)}
 .btn{transition:background .18s, color .18s, border-color .18s, box-shadow .22s, transform .12s}
 .btn:active:not(:disabled){transform:translateY(1px) scale(.99)}
 .chip,.seg button,.qty button{transition:all .18s}
@@ -674,6 +887,77 @@ body.guest .side{top:42px;height:calc(100vh - 42px)}
   body.guest .side{top:auto;height:auto}
 }
 @media (prefers-reduced-motion:reduce){ .guest-eye{animation:none} }
+
+/* ---------- the organiser table ----------
+   One line each, so twenty organisations can be compared without
+   scrolling. A panel each looked tidy with three and fell apart with ten. */
+.tbl-tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.search-bar.sm{flex:1;min-width:190px;padding:8px 13px;border-radius:11px}
+.search-bar.sm input{font-size:.9rem}
+.seg{
+  display:flex;gap:2px;background:var(--card-2);border:1px solid var(--line);
+  border-radius:11px;padding:3px;flex:none;overflow-x:auto;scrollbar-width:none;
+}
+.seg::-webkit-scrollbar{display:none}
+.seg button{
+  border:none;background:transparent;border-radius:8px;padding:7px 13px;
+  font-size:.83rem;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;
+  transition:background .16s, color .16s;
+}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(23,23,27,.1)}
+
+.tbl-wrap{padding:0;overflow-x:auto}
+.org-tbl{width:100%;border-collapse:collapse;min-width:620px}
+.org-tbl th{
+  text-align:left;padding:12px 16px;font-size:.7rem;font-weight:700;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+  border-bottom:1px solid var(--line);white-space:nowrap;
+}
+.org-tbl th.num,.org-tbl td.num{text-align:right}
+.org-tbl td{padding:13px 16px;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:middle}
+.org-tbl tbody tr:last-child td{border-bottom:none}
+.org-tbl tbody tr{cursor:pointer;transition:background .14s}
+.org-tbl tbody tr:hover{background:var(--card-2)}
+.org-tbl td.strong{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.org-tbl td.green{color:var(--green-deep);font-weight:600;font-variant-numeric:tabular-nums}
+.org-tbl td.num{font-variant-numeric:tabular-nums}
+.org-cell{display:flex;align-items:center;gap:11px;min-width:0}
+.org-mark.sm{width:34px;height:34px;border-radius:10px;font-size:.78rem;flex:none}
+.org-nm{font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.org-sub{font-size:.76rem;color:var(--faint);margin-top:1px}
+.share{display:inline-block;font-size:.8rem;font-weight:600;color:var(--muted);min-width:52px}
+.share span{display:block;height:4px;border-radius:99px;background:var(--line);margin-top:4px;overflow:hidden}
+.share i{display:block;height:100%;border-radius:99px;background:var(--orange)}
+.row-go{color:var(--faint);font-size:1.3rem;line-height:1}
+.org-tbl tbody tr:hover .row-go{color:var(--orange-ink)}
+@media(max-width:700px){
+  .org-tbl{min-width:0}
+  .hide-sm{display:none}
+  .org-tbl th,.org-tbl td{padding:11px 12px}
+  .tbl-tools{gap:9px}
+}
+
+/* one organisation, opened from its row */
+.sheet-head{display:flex;align-items:center;gap:13px;margin-bottom:18px}
+.sheet-nm{font-family:var(--display);font-weight:800;font-size:1.15rem;letter-spacing:-.02em}
+
+.warn-box{
+  display:flex;gap:10px;align-items:flex-start;
+  background:var(--orange-soft);border:1px solid rgba(242,106,27,.35);
+  border-radius:11px;padding:12px 14px;font-size:.87rem;color:var(--orange-ink);font-weight:600;
+}
+
+/* a password shown once and never again */
+.cred{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cred > div{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:12px 15px;border-bottom:1px solid var(--line);
+}
+.cred > div:last-child{border-bottom:none;background:var(--orange-soft)}
+.cred span{font-size:.78rem;color:var(--muted);font-weight:600}
+.cred b{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:.95rem;color:var(--ink)}
+.cred b.pw{font-size:1.06rem;letter-spacing:.06em;user-select:all}
 
 /* where the money splits */
 .split-bar{display:flex;height:14px;border-radius:99px;overflow:hidden;margin-bottom:16px;gap:2px}
@@ -823,18 +1107,159 @@ table.plain tr.total td{border-bottom:none;padding-top:11px;font-size:1rem}
 .seg button.on{background:var(--orange);color:var(--on-orange)}
 .seg button:disabled{opacity:.4;cursor:not-allowed}
 
-.qty{display:flex;align-items:center;gap:10px}
-.qty button{width:32px;height:32px;border-radius:9px;border:1px solid var(--line-2);background:var(--card-2);font-size:1.05rem;line-height:1;cursor:pointer;color:var(--text)}
-.qty button:hover{background:var(--card-2);border-color:var(--orange)}
-.qty b{min-width:20px;text-align:center;color:var(--ink)}
+/* ---------- checkout ----------
 
-.tt{border:1px solid var(--line);border-radius:var(--radius-sm);padding:15px;margin-bottom:11px;background:var(--bg-2)}
-.tt.sold{opacity:.5}
-.tt-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
-.tt h4{font-size:.98rem;margin-bottom:3px}
+   Three short steps, each one named. People abandon a checkout when they
+   cannot tell how much is left, so the steps are spelled out and the order
+   stays on screen the whole way through. */
+.ck-steps{display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap}
+.ck-step{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:.76rem;font-weight:600;color:var(--faint);
+}
+.ck-step i{
+  display:grid;place-items:center;width:19px;height:19px;border-radius:50%;
+  background:var(--card-2);border:1px solid var(--line);
+  font-size:.68rem;font-style:normal;font-weight:700;color:var(--faint);
+}
+.ck-step + .ck-step::before{
+  content:"";width:14px;height:1px;background:var(--line-2);margin-right:1px;
+}
+.ck-step.now{color:var(--ink)}
+.ck-step.now i{background:var(--orange);border-color:var(--orange);color:var(--on-orange)}
+.ck-step.done{color:var(--green-deep)}
+.ck-step.done i{background:var(--green-deep);border-color:var(--green-deep);color:#fff}
+.ck-step.done i svg{width:10px;height:10px}
 
-.total-line{display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-top:1px solid var(--line);margin-top:6px}
-.total-line b{font-family:var(--display);font-size:1.3rem;color:var(--ink)}
+.ck-order{
+  border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  background:var(--card);margin-bottom:20px;
+}
+.ck-order-top{
+  display:flex;gap:13px;align-items:center;padding:14px 15px;
+  background:var(--bg-2);border-bottom:1px dashed var(--line-2);
+}
+.ck-when{
+  flex:none;width:46px;padding:6px 0;border-radius:11px;text-align:center;line-height:1.05;
+  background:var(--ink);color:#fff;
+}
+.ck-when .d{font-family:var(--display);font-weight:800;font-size:1.06rem}
+.ck-when .m{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.72);font-weight:600}
+.ck-ev{
+  font-weight:700;font-size:.98rem;letter-spacing:-.01em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ck-where{font-size:.8rem;color:var(--muted);margin-top:2px}
+.ck-lines{padding:11px 15px 3px}
+.ck-line{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:.91rem}
+.ck-line i{
+  font-style:normal;font-weight:700;color:var(--orange-ink);
+  font-variant-numeric:tabular-nums;margin-right:2px;
+}
+.ck-total{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:11px 15px 14px;margin-top:5px;border-top:1px solid var(--line);
+}
+.ck-total span{font-size:.88rem;color:var(--muted)}
+.ck-total b{font-family:var(--display);font-size:1.28rem;color:var(--ink);letter-spacing:-.02em}
+
+/* ---------- choosing tickets ----------
+
+   This is the moment the whole site exists for, so it is built to feel
+   like picking a ticket rather than filling in a form: each type is a
+   stub with a torn edge, choosing one lights it up, and the total is
+   always in view with the amount written on the button itself. */
+.buy-panel{padding:0;overflow:hidden}
+.buy-top{
+  padding:18px 20px 16px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--bg-2),var(--card));
+}
+.buy-top h3{font-size:1.08rem;letter-spacing:-.015em;margin:0 0 3px}
+.buy-top .from{font-size:.84rem;color:var(--muted)}
+.buy-list{padding:14px 16px 4px;display:flex;flex-direction:column;gap:10px}
+
+.tt{
+  position:relative;
+  border:1px solid var(--line);border-radius:14px;
+  padding:14px 15px 14px 22px;background:var(--card);
+  cursor:pointer;
+  transition:border-color .2s, box-shadow .22s, background .2s, transform .18s cubic-bezier(.22,.8,.3,1);
+}
+/* the torn edge of a stub */
+.tt::before{
+  content:"";position:absolute;left:9px;top:12px;bottom:12px;width:2px;
+  background-image:radial-gradient(circle at 1px 2px, var(--line-2) 1px, transparent 1.4px);
+  background-size:2px 7px;
+  transition:background-image .2s;
+}
+.tt:hover{border-color:var(--line-2);box-shadow:0 4px 14px rgba(23,23,27,.07)}
+.tt.picked{
+  border-color:var(--orange);background:var(--orange-soft);
+  box-shadow:0 0 0 3px rgba(242,106,27,.15), 0 6px 18px rgba(242,106,27,.14);
+}
+.tt.picked::before{background-image:radial-gradient(circle at 1px 2px, var(--orange) 1px, transparent 1.4px)}
+.tt.sold{opacity:.55;cursor:default}
+.tt.sold:hover{border-color:var(--line);box-shadow:none}
+.tt-top{display:flex;justify-content:space-between;gap:14px;align-items:center}
+.tt h4{font-size:.97rem;margin-bottom:2px;letter-spacing:-.01em}
+.tt-price{
+  font-family:var(--display);font-weight:800;font-size:1.12rem;
+  color:var(--ink);letter-spacing:-.015em;margin-top:5px;
+}
+.tt-price.free{color:var(--green-deep)}
+.tt-left{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.74rem;font-weight:700;color:var(--orange-ink);margin-top:5px;
+}
+.tt-left::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--orange)}
+
+.qty{display:flex;align-items:center;gap:4px;flex:none;background:var(--card-2);border-radius:11px;padding:3px}
+.tt.picked .qty{background:rgba(255,255,255,.72)}
+.qty button{
+  width:40px;height:40px;border-radius:10px;border:1px solid transparent;background:transparent;
+  font-size:1.15rem;line-height:1;cursor:pointer;color:var(--text);
+  transition:background .15s, color .15s, transform .12s;
+}
+.qty button:hover:not(:disabled){background:var(--card);border-color:var(--line-2);color:var(--orange-ink)}
+.qty button:active:not(:disabled){transform:scale(.92)}
+.qty button:disabled{opacity:.34;cursor:default}
+.qty b{min-width:22px;text-align:center;color:var(--ink);font-variant-numeric:tabular-nums;font-weight:700}
+/* an empty type shows one clear button instead of a zero */
+.tt-add{
+  flex:none;border:1px solid var(--line-2);background:var(--card);color:var(--text);
+  border-radius:11px;padding:0 18px;min-height:44px;min-width:72px;   /* a thumb, not a cursor */
+  font-size:.9rem;font-weight:600;cursor:pointer;
+  transition:all .16s;
+}
+.tt:hover .tt-add{border-color:var(--orange);color:var(--orange-ink);background:var(--orange-soft)}
+
+.buy-foot{padding:4px 16px 16px}
+.total-line{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:14px 0 13px;border-top:1px solid var(--line);margin-bottom:12px;
+}
+.total-line .lbl{font-size:.88rem;color:var(--muted)}
+.total-line .lbl small{display:block;font-size:.74rem;color:var(--faint)}
+.total-line b{
+  font-family:var(--display);font-size:1.5rem;color:var(--ink);letter-spacing:-.025em;
+  font-variant-numeric:tabular-nums;
+}
+/* a small nudge each time the total changes, so it is clearly live */
+.total-line b.bump{animation:totalBump .32s cubic-bezier(.22,.8,.3,1)}
+@keyframes totalBump{
+  0%{transform:scale(1)} 42%{transform:scale(1.09);color:var(--orange-ink)} 100%{transform:scale(1)}
+}
+/* the reassurances, small and factual */
+.buy-trust{
+  display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:13px;
+  font-size:.76rem;color:var(--faint);
+}
+.buy-trust span{display:inline-flex;align-items:center;gap:5px}
+.buy-trust svg{flex:none;color:var(--green-deep)}
+@media (prefers-reduced-motion:reduce){
+  .total-line b.bump{animation:none}
+  .tt,.qty button{transition:none}
+}
 
 .mpesa-note{
   display:flex;gap:11px;align-items:flex-start;background:var(--green-soft);
@@ -931,9 +1356,9 @@ table.plain tr.total td{border-bottom:none;padding-top:11px;font-size:1rem}
   .ev-cols{grid-template-columns:minmax(0,1fr) !important;gap:16px}
   #buyBox{position:static !important;top:auto !important}
   /* less room on a phone, but still the whole poster */
-  .ev-hero{border-radius:14px;margin-bottom:16px;padding:10px}
-  .ev-hero img{max-height:260px}
-  .ev-hero.is-ph{aspect-ratio:2.1/1;padding:0}
+  .ev-hero{border-radius:16px;margin-bottom:16px;padding:16px;min-height:220px}
+  .ev-hero img{max-height:240px}
+  .ev-hero.is-ph{aspect-ratio:2.1/1;min-height:0;padding:0}
   .ph-lg{font-size:2.2rem}
   .ev-chips{gap:7px;margin-bottom:10px}
   .badge,.by-org{font-size:.72rem;padding:4px 9px}

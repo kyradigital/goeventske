@@ -14,26 +14,32 @@
 
 <header class="site-head" id="siteHead"></header>
 
-<section class="page">
+<!-- a dark band to open on: the listing is the product, so it gets a stage -->
+<section class="browse-top">
   <div class="wrap">
-    <div class="section-head left" style="margin-bottom:26px">
-      <h2 class="title">What's on</h2>
-      <p>Every live event on Go Events Kenya, from every organiser.</p>
+    <span class="live-now">Live right now</span>
+    <h1 class="browse-title">What's on<span class="dot">.</span></h1>
+    <p class="browse-sub">Every event on Go Events Kenya, from every organiser — one checkout, one ticket, straight to your phone.</p>
+    <div class="search-bar big">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      <input id="q" type="search" placeholder="Event, venue or town…" autocomplete="off">
     </div>
-
-    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:22px">
-      <div class="search-bar">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
-        <input id="q" type="search" placeholder="Event, venue or town…" autocomplete="off">
-      </div>
-    </div>
-    <div class="chip-row" id="cats"></div>
   </div>
 </section>
 
-<section class="page">
+<!-- the filters follow you down the page -->
+<div class="filter-bar" id="filterBar">
+  <div class="wrap filter-row">
+    <div class="chip-row" id="cats"></div>
+    <span class="result-count" id="count"></span>
+  </div>
+</div>
+
+<section class="page browse-page">
   <div class="wrap">
-    <div id="grid"><div class="panel center"><span class="spinner"></span> Loading events…</div></div>
+    <div id="grid"><div class="grid-skeleton">
+      <i></i><i></i><i></i><i></i><i></i><i></i>
+    </div></div>
   </div>
 </section>
 

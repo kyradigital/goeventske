@@ -301,6 +301,17 @@
     if (pTab === "orgs")     m.innerHTML = pOrgs();
     if (pTab === "activity") m.innerHTML = pActivity();
     $$("#main [data-pact]").forEach((el) => (el.onclick = () => pHandle(el.dataset.pact, el.dataset)));
+    if (pTab === "orgs") {
+      const box = $("#orgQ");
+      if (box) {
+        let t;
+        box.oninput = () => { clearTimeout(t); t = setTimeout(() => {
+          orgSearch = box.value.trim(); pRender();
+          const again = $("#orgQ"); if (again) { again.focus(); again.selectionStart = again.value.length; }
+        }, 220); };
+      }
+      $$("#orgSort button").forEach((b) => (b.onclick = () => { orgSort = b.dataset.sort; pRender(); }));
+    }
     UI.stagger(".kpis", 55);
     UI.animate(m);
   }
@@ -359,41 +370,224 @@
       </div>`;
   }
 
+  /* ==========================================================
+     ORGANISERS
+
+     A panel each was unreadable past three of them: you had to
+     scroll to compare anyone. This is a table — one line per
+     organisation, sortable, with the money in aligned columns so
+     the biggest earner is obvious at a glance. Opening a row
+     shows everything else about them.
+     ========================================================== */
+  let orgSort = "gross", orgSearch = "";
+
   function pOrgs() {
-    const rows = pCache.orgs;
-    if (!rows.length) return `<div class="app-head"><div><h1>Organisers</h1></div></div>
-      <div class="empty"><h3>Nobody yet</h3><p>Approved organisers appear here.</p></div>`;
+    const all = pCache.orgs || [];
+    if (!all.length) return `<div class="app-head"><div><h1>Organisers</h1></div></div>
+      <div class="empty"><h3>Nobody yet</h3><p>Organisations appear here as people sign up.</p></div>`;
+
+    const q = orgSearch.toLowerCase();
+    const rows = all.filter((o) => !q ||
+      [o.name, o.handle, o.owner, o.email].some((v) => String(v || "").toLowerCase().includes(q)));
+
+    const KEY = {
+      gross:  (a, b) => b.gross - a.gross,
+      fee:    (a, b) => b.our_fee - a.our_fee,
+      tickets:(a, b) => b.tickets - a.tickets,
+      events: (a, b) => b.events - a.events,
+      newest: (a, b) => new Date(b.created_at) - new Date(a.created_at),
+      name:   (a, b) => String(a.name).localeCompare(String(b.name)),
+    };
+    rows.sort(KEY[orgSort] || KEY.gross);
+
+    const totalGross = all.reduce((n, o) => n + o.gross, 0);
+
     return `
       <div class="app-head">
-        <div><h1>Organisers</h1><p>${rows.length} on the platform, biggest first.</p></div>
+        <div><h1>Organisers</h1>
+          <p>${all.length} on the platform${q ? ` · ${rows.length} matching` : ""}.</p></div>
       </div>
-      ${rows.map((o) => `
-        <div class="panel">
-          <div class="panel-head">
-            <div style="min-width:0">
-              <h3 style="margin-bottom:2px">${esc(o.name)}</h3>
-              <div class="small muted"><span class="code">${esc(o.handle || "—")}</span>
-                · ${esc(o.owner || "—")} · ${esc(o.email || "no email")}${o.phone ? " · " + esc(o.phone) : ""}</div>
-            </div>
-            <button class="btn btn-soft btn-sm" data-pact="viewas" data-id="${o.id}"
-              data-name="${esc(o.name)}">View as</button>
+
+      <div class="tbl-tools">
+        <div class="search-bar sm">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+          <input id="orgQ" type="search" placeholder="Name, handle or owner…" value="${esc(orgSearch)}">
+        </div>
+        <div class="seg" id="orgSort">
+          ${[["gross", "Revenue"], ["fee", "Our fee"], ["tickets", "Tickets"], ["newest", "Newest"], ["name", "A–Z"]]
+            .map(([k, l]) => `<button data-sort="${k}" class="${orgSort === k ? "on" : ""}">${l}</button>`).join("")}
+        </div>
+      </div>
+
+      ${!rows.length ? `<div class="empty"><h3>Nobody matches that</h3></div>` : `
+      <div class="panel tbl-wrap">
+        <table class="org-tbl">
+          <thead><tr>
+            <th>Organisation</th>
+            <th class="num">They took</th>
+            <th class="num">Our fee</th>
+            <th class="num hide-sm">Tickets</th>
+            <th class="num hide-sm">Events</th>
+            <th class="num">Share</th>
+            <th></th>
+          </tr></thead>
+          <tbody>
+            ${rows.map((o) => {
+              const share = totalGross ? Math.round((o.gross / totalGross) * 100) : 0;
+              return `
+              <tr data-pact="orgopen" data-id="${o.id}">
+                <td>
+                  <div class="org-cell">
+                    <div class="org-mark sm" style="background:${esc(o.colour || "#17171b")};color:${inkOn(o.colour || "#17171b")}">${esc(initials(o.name))}</div>
+                    <div style="min-width:0">
+                      <div class="org-nm">${esc(o.name)}</div>
+                      <div class="org-sub"><span class="code">${esc(o.handle || "—")}</span>${o.last_seen ? " · " + esc(ago(o.last_seen)) : " · never signed in"}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="num strong">${esc(ksh(o.gross))}</td>
+                <td class="num green">${esc(ksh(o.our_fee))}</td>
+                <td class="num hide-sm">${o.scanned} / ${o.tickets}</td>
+                <td class="num hide-sm">${o.live} / ${o.events}</td>
+                <td class="num">
+                  <div class="share">${share}%<span><i style="width:${Math.max(2, share)}%"></i></span></div>
+                </td>
+                <td class="num"><span class="row-go">›</span></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`}`;
+  }
+
+  /* everything about one organisation, opened from its row */
+  function orgSheet(id) {
+    const o = (pCache.orgs || []).find((x) => x.id === id);
+    if (!o) return;
+    modal(esc(o.name), `
+      <div class="sheet-head">
+        <div class="org-mark" style="background:${esc(o.colour || "#17171b")};color:${inkOn(o.colour || "#17171b")}">${esc(initials(o.name))}</div>
+        <div style="min-width:0">
+          <div class="sheet-nm">${esc(o.name)}</div>
+          <div class="small muted"><span class="code">${esc(o.handle || "—")}</span> · joined ${esc(shortDate(o.created_at))}</div>
+        </div>
+      </div>
+
+      <div class="kpis" style="margin:0 0 16px">
+        <div class="kpi"><div class="k">They took</div><div class="v">${esc(ksh(o.gross))}</div></div>
+        <div class="kpi green"><div class="k">Our fee</div><div class="v">${esc(ksh(o.our_fee))}</div></div>
+        <div class="kpi"><div class="k">Events</div><div class="v">${o.live} / ${o.events}</div></div>
+        <div class="kpi"><div class="k">Tickets</div><div class="v">${o.scanned} / ${o.tickets}</div></div>
+      </div>
+
+      <table class="plain" style="margin-bottom:6px">
+        <tr><td>Owner</td><td class="num">${esc(o.owner || "—")}</td></tr>
+        <tr><td>Email</td><td class="num">${esc(o.email || "not given")}</td></tr>
+        <tr><td>Phone</td><td class="num">${esc(o.phone || "not given")}</td></tr>
+        <tr><td>Payout number</td><td class="num">${esc(o.payout_till || "not set")}</td></tr>
+        <tr><td>Our cut</td><td class="num">${esc(o.fee_pct)}%</td></tr>
+        <tr class="total"><td>Last active</td><td class="num">${o.last_seen ? esc(ago(o.last_seen)) : "never signed in"}</td></tr>
+      </table>`,
+      `<button class="btn btn-soft" data-close>Close</button>
+       <button class="btn btn-soft" data-pact="resetpw" data-id="${o.id}">Set password</button>
+       <button class="btn btn-primary" data-pact="viewas" data-id="${o.id}">View as ${esc(o.name)}</button>`);
+    $$("#modalHost [data-pact]").forEach((el) =>
+      (el.onclick = () => pHandle(el.dataset.pact, el.dataset)));
+  }
+
+  /* ---------- setting a password ----------
+
+     The platform owner types the new password themselves. Existing
+     passwords cannot be read by anyone — they are one-way hashes — so
+     this replaces one rather than revealing it. */
+  function resetPassword(id) {
+    const o = (pCache.orgs || []).find((x) => x.id === id);
+    if (!o) return toast("Couldn't find that organisation — reload and try again.", "err");
+
+    modal(`Set a password for ${o.name}`, `
+      <p class="small" style="margin:0 0 16px">
+        Choose what <b>${esc(o.name)}</b> will sign in with. Their current password stops working
+        the moment you save this.</p>
+
+      <div class="cred" style="margin-bottom:16px">
+        <div><span>They sign in as</span><b>${esc(o.handle || "—")}</b></div>
+      </div>
+
+      <div class="field" style="margin-bottom:10px">
+        <label for="pw1">New password</label>
+        <input id="pw1" type="text" autocomplete="off" spellcheck="false"
+               placeholder="At least 8 characters">
+      </div>
+      <button class="btn btn-soft btn-sm" id="pwGen" type="button">Suggest a strong one</button>
+      <p class="tiny" id="pwMsg" style="margin:12px 0 0;min-height:1em"></p>`,
+      `<button class="btn btn-soft" data-close>Cancel</button>
+       <button class="btn btn-primary" id="pwGo">Save password</button>`);
+
+    const box = $("#pw1");
+    if (box) box.focus();
+
+    $("#pwGen").onclick = () => {
+      /* no look-alike characters, so it survives being read down a phone */
+      const AB = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      const ch = Array.from(bytes, (b) => AB[b % AB.length]);
+      box.value = [0, 4, 8, 12].map((i) => ch.slice(i, i + 4).join("")).join("-");
+      box.focus(); box.select();
+      say("");
+    };
+
+    const say = (text, bad) => {
+      const m = $("#pwMsg");
+      if (m) { m.textContent = text; m.style.color = bad ? "var(--red)" : "var(--muted)"; }
+    };
+
+    box.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#pwGo").click(); });
+
+    $("#pwGo").onclick = async () => {
+      const pw = box.value.trim();
+      if (pw.length < 8) return say("Use at least 8 characters.", true);
+
+      const btn = $("#pwGo");
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+      say("Saving…");
+
+      if (typeof PL.setOrgPassword !== "function") {
+        btn.disabled = false; btn.textContent = "Save password";
+        return say("This page is an old copy. Reload with Ctrl+Shift+R.", true);
+      }
+
+      try {
+        const r = await PL.setOrgPassword(o.id, pw);
+        modal("Password changed", `
+          <p class="small" style="margin:0 0 16px">
+            <b>${esc(r.org_name)}</b> can sign in with these right away.</p>
+          <div class="cred">
+            <div><span>Sign-in name</span><b>${esc(r.handle)}</b></div>
+            <div><span>Password</span><b class="pw">${esc(pw)}</b></div>
           </div>
-          <div class="kpis" style="margin:0 0 12px">
-            <div class="kpi"><div class="k">They took</div><div class="v">${esc(ksh(o.gross))}</div></div>
-            <div class="kpi green"><div class="k">Our fee</div><div class="v">${esc(ksh(o.our_fee))}</div></div>
-            <div class="kpi"><div class="k">Events</div><div class="v">${o.live} / ${o.events}</div></div>
-            <div class="kpi"><div class="k">Tickets</div><div class="v">${o.scanned} / ${o.tickets}</div></div>
-          </div>
-          <div class="tiny muted">
-            Joined ${esc(shortDate(o.created_at))}${o.last_seen ? " · last active " + esc(ago(o.last_seen)) : ""}
-            ${o.payout_till ? " · payout to " + esc(o.payout_till) : " · no payout number set"}
-          </div>
-        </div>`).join("")}`;
+          ${r.repaired ? `
+          <div class="warn-box" style="margin-top:14px">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M4 12.5l5.2 5L20 6.5"/></svg>
+            <div>This account used to sign in as <b>${esc(r.was)}</b>, so the handle never worked for it.
+              That is now fixed — it signs in as <b>${esc(r.handle)}</b>.</div>
+          </div>` : ""}
+          <p class="tiny muted" style="margin:14px 0 0">
+            Send it by a route they already trust. The change is recorded in Activity —
+            the password itself is not.</p>`,
+          `<button class="btn btn-primary" data-close>Done</button>`);
+      } catch (e) {
+        btn.disabled = false; btn.textContent = "Save password";
+        say(e.message, true);
+      }
+    };
   }
 
   const ACTION_LABEL = {
     "platform.signin": "You signed in",
     "platform.view_as": "You viewed an organiser",
+    "platform.password_reset": "You reset a password",
     "platform.view_as_end": "You stopped viewing",
     "organiser.created": "Created an organisation",
     "organiser.applied": "Applied to sell",
@@ -435,7 +629,9 @@
 
   async function pHandle(act, d) {
     if (act === "refresh") return pGo(pTab);
-    if (act === "viewas")  return startViewing(d.id, d.name);
+    if (act === "viewas")  { $("#modalHost").innerHTML = ""; return startViewing(d.id, d.name); }
+    if (act === "orgopen") return orgSheet(d.id);
+    if (act === "resetpw") return resetPassword(d.id);
   }
 
   /* ==========================================================
