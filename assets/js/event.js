@@ -31,9 +31,13 @@
 
       <div class="ev-cols" id="cols">
         <div>
-          <div class="ev-img ev-hero" style="background:${tint(ev.name)}">
-            ${UI.safeImage(ev.image) ? `<img src="${UI.safeImage(ev.image)}" alt="">` : `<span class="ph ph-lg">${esc(initials(ev.name))}</span>`}
-          </div>
+          ${UI.safeImage(ev.image)
+            ? `<div class="ev-img ev-hero">
+                 <img src="${UI.safeImage(ev.image)}" alt="Poster for ${esc(ev.name)}">
+               </div>`
+            : `<div class="ev-img ev-hero is-ph" style="background:${tint(ev.name)}">
+                 <span class="ph ph-lg">${esc(initials(ev.name))}</span>
+               </div>`}
 
           <div class="ev-chips">
             <span class="badge live">${esc(ev.category)}</span>

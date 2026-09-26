@@ -456,7 +456,33 @@ tbody tr:hover{background:var(--card-2)}
 .ev-facts{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 
 .ev-cols{display:grid;gap:34px;grid-template-columns:1.25fr .95fr;align-items:start}
-.ev-hero{border-radius:var(--radius);aspect-ratio:16/9;margin-bottom:26px}
+/* The poster on an event's own page.
+
+   Posters arrive in every shape — tall A4 flyers, square Instagram tiles,
+   wide banners. Cropping them to one fixed shape cut the artwork and often
+   the text with it, so the whole image is shown at its own proportions,
+   capped in height so it stays a poster and not a billboard. The frame
+   around it keeps the page tidy whatever shape turns up. */
+.ev-hero{
+  aspect-ratio:auto;
+  width:fit-content;max-width:100%;
+  background:var(--card-2);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:14px;
+  margin:0 auto 26px 0;          /* hugs the poster, lines up with the title */
+  display:grid;place-items:center;
+  overflow:hidden;
+}
+.ev-hero img{
+  width:auto;height:auto;
+  max-width:100%;max-height:360px;
+  object-fit:contain;
+  border-radius:10px;
+  box-shadow:0 6px 22px rgba(23,23,27,.13);
+}
+/* no poster: generated art, which does want a fixed shape */
+.ev-hero.is-ph{aspect-ratio:16/9;width:100%;padding:0;border:none}
 .ev-chips{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 
 /* the bar that follows a thumb up the page */
@@ -596,6 +622,79 @@ tbody tr:hover{background:var(--card-2)}
 }
 @keyframes ripple{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.55);opacity:0}}
 @media(prefers-reduced-motion:reduce){ .await-mark > span::after{animation:none;opacity:0} }
+
+/* ---------- the sign-in name ---------- */
+.handle-field{display:flex;align-items:center}
+.handle-field input{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;letter-spacing:.02em}
+
+/* ---------- the platform owner's view ---------- */
+body.platform .side{background:var(--ink)}
+body.platform .side .org-pill{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
+body.platform .side .org-pill .nm{color:#fff}
+body.platform .side .org-pill .sb{color:rgba(255,255,255,.6)}
+body.platform .side-nav button{color:rgba(255,255,255,.72)}
+body.platform .side-nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+body.platform .side-nav button.active{background:var(--orange);color:var(--on-orange)}
+body.platform .side-foot .btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);color:#fff}
+body.platform .side-foot .btn:hover{background:rgba(255,255,255,.16)}
+
+/* ---------- looking at an organiser as a guest ----------
+   A band the owner cannot miss, pushing the whole app down so it
+   can never be scrolled out of sight. */
+.guest-bar{
+  position:fixed;inset:0 0 auto 0;z-index:80;
+  display:flex;align-items:center;gap:12px;
+  padding:9px 18px;background:var(--ink);color:#fff;
+  font-size:.9rem;line-height:1.35;
+  box-shadow:0 1px 0 rgba(0,0,0,.2)
+}
+.guest-bar b{color:var(--orange)}
+.guest-note{color:rgba(255,255,255,.62)}
+.guest-bar .btn{
+  margin-left:auto;flex:none;
+  background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);color:#fff
+}
+.guest-bar .btn:hover{background:rgba(255,255,255,.22)}
+.guest-eye{
+  flex:none;width:9px;height:9px;border-radius:50%;
+  background:var(--orange);box-shadow:0 0 0 0 rgba(242,106,27,.55);
+  animation:guestPulse 2.4s ease-out infinite
+}
+@keyframes guestPulse{
+  0%{box-shadow:0 0 0 0 rgba(242,106,27,.55)}
+  70%{box-shadow:0 0 0 9px rgba(242,106,27,0)}
+  100%{box-shadow:0 0 0 0 rgba(242,106,27,0)}
+}
+body.guest{padding-top:42px}
+body.guest .side{top:42px;height:calc(100vh - 42px)}
+@media (max-width:820px){
+  .guest-bar{padding:8px 14px;font-size:.84rem;gap:9px}
+  .guest-note{display:none}
+  body.guest{padding-top:38px}
+  body.guest .side{top:auto;height:auto}
+}
+@media (prefers-reduced-motion:reduce){ .guest-eye{animation:none} }
+
+/* where the money splits */
+.split-bar{display:flex;height:14px;border-radius:99px;overflow:hidden;margin-bottom:16px;gap:2px}
+.split-bar span{display:block}
+table.plain{width:100%;border-collapse:collapse}
+table.plain td{padding:7px 0;font-size:.92rem;border-bottom:1px solid var(--line)}
+table.plain td.num{text-align:right;font-variant-numeric:tabular-nums}
+table.plain tr.total td{border-bottom:none;padding-top:11px;font-size:1rem}
+.sw{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:8px;vertical-align:middle}
+
+/* the activity feed */
+.feed-row{display:flex;gap:12px;align-items:flex-start;padding:12px 18px;border-bottom:1px solid var(--line)}
+.feed-row:last-child{border-bottom:none}
+.feed-what{font-size:.92rem;font-weight:600;color:var(--ink);line-height:1.4}
+.feed-dot{width:8px;height:8px;border-radius:99px;background:var(--line-2);flex:none;margin-top:7px}
+.feed-dot.order{background:var(--green)}
+.feed-dot.event{background:var(--orange)}
+.feed-dot.organiser{background:var(--orange-ink)}
+.feed-dot.ticket{background:var(--green-deep)}
+.feed-dot.platform{background:var(--ink)}
+@media(max-width:640px){ .feed-row{padding:11px 15px} }
 
 /* ---------- checkout steps ---------- */
 .steps-dots{display:flex;gap:6px;margin-top:7px}
@@ -831,8 +930,10 @@ tbody tr:hover{background:var(--card-2)}
   .page{padding:16px 0 36px}
   .ev-cols{grid-template-columns:minmax(0,1fr) !important;gap:16px}
   #buyBox{position:static !important;top:auto !important}
-  /* a shorter banner: generated art earns less room than a real poster */
-  .ev-hero{aspect-ratio:2.1/1;border-radius:14px;margin-bottom:16px}
+  /* less room on a phone, but still the whole poster */
+  .ev-hero{border-radius:14px;margin-bottom:16px;padding:10px}
+  .ev-hero img{max-height:260px}
+  .ev-hero.is-ph{aspect-ratio:2.1/1;padding:0}
   .ph-lg{font-size:2.2rem}
   .ev-chips{gap:7px;margin-bottom:10px}
   .badge,.by-org{font-size:.72rem;padding:4px 9px}

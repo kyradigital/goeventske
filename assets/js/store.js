@@ -104,9 +104,30 @@
     try { localStorage.removeItem(PENDING_ORG); } catch (e) { /* nothing to do */ }
   }
 
+  /* A handle is lowercase letters and digits. The auth account is held against
+     a handle-shaped address that only this system uses; the organiser's real
+     email lives beside their organisation, for telling them things. */
+  const cleanHandle = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const handleEmail = (s) => cleanHandle(s) + "@accounts.goeventskenya.online";
+
   /* the signed-in organiser, cached for the life of the page */
   let mine = null;
+
+  /* When the platform owner is looking over an organiser's shoulder, this
+     holds that organisation. Everything below reads it and nothing writes
+     while it is set — the database enforces the same thing independently,
+     because the owner was only ever granted permission to read. */
+  let watching = null;
+
   async function whoami() {
+    if (watching) {
+      const who = await realMe();
+      return { ...who, org: watching };
+    }
+    return realMe();
+  }
+
+  async function realMe() {
     if (mine) return mine;
     const { data: { session } } = await sb.auth.getSession();
     if (!session) throw new Error(FRIENDLY.NOT_SIGNED_IN);
@@ -129,39 +150,57 @@
     },
 
     async me() {
-      const info = await whoami();
-      return { user: info.user, org: info.org };
+      const info = await realMe();
+      return { user: info.user, org: info.org, platform_admin: !!info.platform_admin };
     },
 
-    async signIn(email, password) {
+    /* An organiser signs in with their handle. The auth account is held
+       against a handle-shaped address, so there is nothing to look up and no
+       way to probe which emails exist. An address still works, for the
+       accounts that were made before handles. */
+    async signIn(who, password) {
+      const raw = String(who || "").trim();
+      const email = raw.includes("@") ? raw.toLowerCase() : handleEmail(raw);
       const { error } = await sb.auth.signInWithPassword({
-        email: String(email || "").trim().toLowerCase(), password: String(password || "")
+        email, password: String(password || "")
       });
       if (error) {
-        if (/invalid login/i.test(error.message)) throw new Error("That email and password don't match.");
+        if (/invalid login/i.test(error.message))
+          throw new Error("That sign-in name and password don't match.");
         boom(error);
       }
       mine = null;
       const info = await whoami();
-      return { user: info.user, org: info.org };
+      return { user: info.user, org: info.org, platform_admin: !!info.platform_admin };
     },
 
-    async signUp({ org_name, name, email, password }) {
+    async signUp({ org_name, handle, name, password }) {
       if (!String(org_name || "").trim()) throw new Error("What is the organisation called?");
+      const h = cleanHandle(handle || org_name);
+      if (h.length < 3) throw new Error("That sign-in name is too short — 3 letters or more.");
       if (String(password || "").length < 8) throw new Error("Use at least 8 characters for the password.");
 
       const { data, error } = await sb.auth.signUp({
-        email: String(email || "").trim().toLowerCase(), password: String(password)
+        email: handleEmail(h), password: String(password),
+        options: { data: { handle: h } }
       });
       if (error) {
         if (/already registered|already been/i.test(error.message))
-          throw new Error("There is already an account with that email. Sign in instead.");
+          throw new Error("That sign-in name is taken. Try another.");
+        /* Supabase is still set to send a confirmation email for every new
+           account. These accounts sign in with a handle, not an address, so
+           there is nothing to confirm and the attempt only burns the hourly
+           send limit. Say what to do rather than repeating the raw error. */
+        if (/rate limit|too many requests/i.test(error.message))
+          throw new Error("Sign-ups are switched off at the moment — " +
+            "email confirmation is still on in Supabase and needs turning off.");
         boom(error);
       }
-      /* If the project asks people to confirm their email there is no session
-         yet, so the application cannot be filed until they come back. */
+      /* The account is live immediately — nothing to confirm, because these
+         accounts have no email address to confirm. If a session somehow does
+         not come back, say so plainly rather than carrying on. */
       remember({ org_name, name });
-      if (!data.session) throw new Error("CONFIRM_EMAIL");
+      if (!data.session) throw new Error("The account was made but could not be opened. Sign in with your new name and password.");
 
       mine = null;
       return { pending: true };
@@ -169,22 +208,60 @@
 
     /* Selling tickets is by approval, so this asks rather than creates.
        No organisation exists until the platform owner says yes. */
-    async applyForOrg({ org_name, name, phone, note }) {
+    /* Creates the organisation on the signed-in account. Nobody approves
+       anything — they are selling the moment this returns. */
+    async createOrg({ org_name, handle, name, phone, note }) {
       if (!String(org_name || "").trim()) throw new Error("What is the organisation called?");
       if (!String(name || "").trim()) throw new Error("We need your name.");
-      await rpc("apply_for_org", {
+      const r = await rpc("create_my_org", {
         p_org_name: org_name, p_person: name,
+        p_handle: cleanHandle(handle || org_name) || null,
         p_phone: phone || null, p_note: note || null
       });
       forget();
-      return { status: "pending" };
+      mine = null;
+      return r;
     },
 
-    /* null when they have never applied */
-    async myApplication() {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) return null;
-      return rpc("my_application");
+    /* is this sign-in name free? yes or no, nothing else */
+    async handleFree(handle) {
+      const h = cleanHandle(handle);
+      if (h.length < 3) return false;
+      return rpc("handle_free", { p_handle: h });
+    },
+
+    /* ---------- the platform owner ---------- */
+    async adminOverview()     { return rpc("admin_overview"); },
+    async adminOrgs()         { return rpc("admin_orgs"); },
+    async adminActivity(limit, action) {
+      return rpc("admin_activity", { p_limit: limit || 120, p_action: action || null });
+    },
+    /* ---------- looking over an organiser's shoulder ----------
+       Read only, and on the record. There is no password involved and
+       nothing is borrowed from the organiser's account: the owner reads
+       with their own permissions, which the database grants for SELECT
+       and nothing else. */
+    async viewAsOrg(org_id) {
+      const who = await realMe();
+      if (!who.platform_admin) throw new Error("NOT_ALLOWED");
+      const org = await rpc("admin_org_detail", { p_org: org_id });
+      watching = org;
+      await PL.logAction("platform.view_as", org.name, { org_id: org.id });
+      return org;
+    },
+
+    async stopViewing() {
+      const was = watching;
+      watching = null;
+      if (was) await PL.logAction("platform.view_as_end", was.name, { org_id: was.id });
+    },
+
+    watching() { return watching; },
+
+    async logAction(action, detail, meta) {
+      try { await rpc("log_activity", { p_action: action, p_detail: detail || null,
+                                        p_org: null, p_meta: meta || {} }); }
+      catch (e) { /* a record that fails must never block the thing it records */ }
     },
 
     async signOut() {
@@ -321,7 +398,7 @@
 
     /* ---------- the organiser's own data ---------- */
     async dashboard() {
-      const d = await rpc("dashboard");
+      const d = await rpc("dashboard", { p_org: watching ? watching.id : null });
       return {
         gross: d.gross, net: d.net, fee_pct: Number(d.fee_pct),
         tickets_sold: d.tickets_sold, scanned: d.scanned,
@@ -488,6 +565,20 @@
       return sb.storage.from("media").getPublicUrl(path).data.publicUrl;
     }
   };
+
+  /* Nothing may be changed while the owner is watching. Each of these is
+     wrapped once, here, so a method added later is not quietly left open —
+     it simply is not on this list, and the list is the thing to read. */
+  ["saveEvent", "deleteEvent", "saveTicketType", "deleteTicketType",
+   "markPaid", "cancelOrder", "saveOrg", "uploadImage",
+   "useTicket", "voidTicket"].forEach((name) => {
+    const real = PL[name];
+    PL[name] = function () {
+      if (watching) throw new Error("You are viewing " + watching.name +
+        " as a guest. Nothing here can be changed.");
+      return real.apply(PL, arguments);
+    };
+  });
 
   async function freeSlug(name) {
     const base = String(name).toLowerCase().trim()

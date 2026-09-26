@@ -18,47 +18,97 @@
       <div style="text-align:center;margin-bottom:22px">${UI.LOGO}</div>
       <h2>${signup ? "Start selling tickets" : "Welcome back"}</h2>
       <p class="muted small" style="margin:0 0 22px">
-        ${signup ? "Tell us about your events. We check every organiser by hand before they can sell."
-                 : "Sign in to your organiser dashboard."}</p>
+        ${signup ? "Set up your organisation and start selling straight away."
+                 : "Sign in with your organisation's sign-in name."}</p>
 
       ${signup ? `
         <div class="field"><label>Organisation name</label>
           <input id="aOrg" placeholder="e.g. Nyali Beach Club" autocomplete="organization"></div>` : ""}
-      <div class="field"><label>${signup ? "Your name" : "Email"}</label>
-        <input id="${signup ? "aName" : "aEmail"}" placeholder="${signup ? "Jane Mwangi" : "you@example.com"}"
-               type="${signup ? "text" : "email"}" autocomplete="${signup ? "name" : "email"}"></div>
-      ${signup ? `<div class="field"><label>Phone <span class="muted small">(optional)</span></label>
+
+      <div class="field" style="margin-bottom:${signup ? "6px" : "16px"}">
+        <label for="aHandle">Sign-in name</label>
+        <div class="handle-field">
+          <input id="aHandle" placeholder="nyalibeachclub" autocomplete="username"
+                 autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
+        </div>
+        ${signup ? `<p class="tiny muted" id="aHandleNote" style="margin:6px 0 16px">
+          Lowercase letters and numbers, no spaces. This is what you'll sign in with.</p>` : ""}
+      </div>
+
+      ${signup ? `
+        <div class="field"><label>Your name</label>
+          <input id="aName" placeholder="Jane Mwangi" autocomplete="name"></div>
+        <div class="field"><label>Phone <span class="muted small">(optional)</span></label>
           <input id="aPhone" inputmode="tel" placeholder="07XX XXX XXX" autocomplete="tel"></div>
-        <div class="field"><label>What kind of events do you put on?</label>
-          <textarea id="aNote" rows="3" placeholder="A line or two — the sort of events, roughly how often, where."></textarea></div>
-        <div class="field"><label>Email</label>
-          <input id="aEmail" type="email" placeholder="you@example.com" autocomplete="email"></div>` : ""}
+        <div class="field"><label>What kind of events do you put on? <span class="muted small">(optional)</span></label>
+          <textarea id="aNote" rows="3" placeholder="A line or two — the sort of events, roughly how often, where."></textarea></div>` : ""}
+
       <div class="field"><label>Password</label>
         <input id="aPass" type="password" placeholder="${signup ? "At least 8 characters" : "••••••••"}"
                autocomplete="${signup ? "new-password" : "current-password"}"></div>
 
-      <button class="btn btn-primary btn-block btn-lg" id="aGo">${signup ? "Apply to sell tickets" : "Sign in"}</button>
+      <button class="btn btn-primary btn-block btn-lg" id="aGo">${signup ? "Create account" : "Sign in"}</button>
 
       <p class="auth-switch">
         ${signup ? "Already selling with us?" : "Want to sell tickets?"}
-        <a id="aSwitch">${signup ? "Sign in" : "Apply for an account"}</a>
-      </p>
-
-`;
+        <a id="aSwitch">${signup ? "Sign in" : "Create an account"}</a>
+      </p>`;
 
     $("#aGo").onclick = () => (signup ? doSignUp() : doSignIn());
     $("#aSwitch").onclick = () => authView(signup ? "signin" : "signup");
     $("#aPass").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#aGo").click(); });
+
+    const handle = $("#aHandle");
+    /* the field only ever holds what a handle may hold */
+    handle.addEventListener("input", () => {
+      const clean = handle.value.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (clean !== handle.value) handle.value = clean;
+      if (signup) checkHandle();
+    });
+    handle.focus();
+
+    if (signup) {
+      /* suggest a handle from the organisation name, until they touch it */
+      let touched = false;
+      handle.addEventListener("input", () => { touched = true; });
+      $("#aOrg").addEventListener("input", () => {
+        if (touched) return;
+        handle.value = $("#aOrg").value.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+        checkHandle();
+      });
+    }
+  }
+
+  let handleTimer;
+  function checkHandle() {
+    const note = $("#aHandleNote"), value = $("#aHandle").value;
+    if (!note) return;
+    clearTimeout(handleTimer);
+    if (value.length < 3) {
+      note.textContent = "Lowercase letters and numbers, no spaces. This is what you'll sign in with.";
+      note.style.color = "var(--muted)";
+      return;
+    }
+    handleTimer = setTimeout(async () => {
+      let free = false;
+      try { free = await PL.handleFree(value); } catch (e) { return; }
+      note.textContent = free ? `“${value}” is free` : `“${value}” is taken — try another`;
+      note.style.color = free ? "var(--green)" : "var(--red)";
+    }, 350);
   }
 
   async function doSignIn() {
     const btn = $("#aGo");
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
     try {
-      const r = await PL.signIn($("#aEmail").value, $("#aPass").value);
+      const r = await PL.signIn($("#aHandle").value, $("#aPass").value);
       me = r.user; org = r.org;
+      if (r.platform_admin) return platformBoot();
+      PL.logAction("organiser.signin", org && org.name);
       enter();
     } catch (e) {
+      /* the account is fine, it just has no organisation on it yet */
+      if (e.message === "NEEDS_ORG") return setupView();
       btn.disabled = false; btn.textContent = "Sign in";
       toast(e.message, "err");
     }
@@ -69,38 +119,24 @@
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
     try {
       await PL.signUp({
-        org_name: $("#aOrg").value, name: $("#aName").value,
-        email: $("#aEmail").value, password: $("#aPass").value
+        org_name: $("#aOrg").value, handle: $("#aHandle").value,
+        name: $("#aName").value, password: $("#aPass").value
       });
-      /* the account exists; now ask permission to sell with it */
-      await PL.applyForOrg({
-        org_name: $("#aOrg").value, name: $("#aName").value,
+      /* the account exists; give it its organisation and let them in */
+      await PL.createOrg({
+        org_name: $("#aOrg").value, handle: $("#aHandle").value,
+        name: $("#aName").value,
         phone: $("#aPhone") ? $("#aPhone").value : "",
         note: $("#aNote") ? $("#aNote").value : ""
       });
-      waitView();
+      const r = await PL.me();
+      me = r.user; org = r.org;
+      PL.logAction("organiser.signin", org && org.name);
+      enter();
     } catch (e) {
-      if (e.message === "CONFIRM_EMAIL") return confirmView($("#aEmail").value.trim());
-      btn.disabled = false; btn.textContent = "Apply to sell tickets";
+      btn.disabled = false; btn.textContent = "Create account";
       toast(e.message, "err");
     }
-  }
-
-  /* Some projects ask people to click a link in an email before they can sign
-     in. Say so on the page — a red toast reads like something went wrong. */
-  function confirmView(email) {
-    $("#authCard").innerHTML = `
-      <div style="text-align:center;margin-bottom:22px">${UI.LOGO}</div>
-      <h2>Check your email</h2>
-      <p class="muted small" style="margin:0 0 18px">
-        We've sent a confirmation link to <b>${esc(email)}</b>. Click it, then come back here
-        and sign in — everything else is already saved.</p>
-      <div class="panel" style="box-shadow:none;background:var(--card-2);margin-bottom:18px">
-        <p class="tiny muted" style="margin:0">If the link opens a page that won't load, don't worry:
-          the confirmation still went through. Just sign in below.</p>
-      </div>
-      <button class="btn btn-primary btn-block" id="cGo">Go to sign in</button>`;
-    $("#cGo").onclick = () => authView("signin");
   }
 
   function enter() {
@@ -120,79 +156,34 @@
   (async function boot() {
     try {
       const r = await PL.me();
+      if (r.platform_admin) { me = r.user; return platformBoot(); }
       me = r.user; org = r.org;
       enter();
     } catch (e) {
       /* Signed in, but no organisation: they are waiting on a decision, were
          turned down, or never finished applying. */
-      if (e.message === "NEEDS_ORG") return waitView();
+      if (e.message === "NEEDS_ORG") return setupView();
       authView(qs("signup") ? "signup" : "signin");
     }
   })();
 
-  async function waitView() {
-    let app = null;
-    try { app = await PL.myApplication(); } catch (e) { /* treat as never applied */ }
-
-    const signOutLink = `<p class="auth-switch"><a id="wOut">Sign out</a></p>`;
-    const wireOut = () => {
-      $("#wOut").onclick = async () => { await PL.signOut(); location.reload(); };
-    };
-
-    if (app && app.status === "pending") {
-      $("#authCard").innerHTML = `
-        <div style="text-align:center;margin-bottom:20px">${UI.LOGO}</div>
-        <div class="await-mark"><span></span></div>
-        <h2 class="center">Waiting on approval</h2>
-        <p class="muted small center" style="margin:0 0 18px">
-          Your application for <b>${esc(app.org_name)}</b> is with us. Every organiser is checked by
-          hand, so this usually takes a day or so. You'll get an email either way.</p>
-        <div class="panel" style="box-shadow:none;background:var(--bg-2)">
-          <p class="tiny muted" style="margin:0">Applied ${esc(ago(app.created_at))}. Nothing more to do —
-            you can close this page.</p>
-        </div>
-        ${signOutLink}`;
-      return wireOut();
-    }
-
-    if (app && app.status === "rejected") {
-      $("#authCard").innerHTML = `
-        <div style="text-align:center;margin-bottom:20px">${UI.LOGO}</div>
-        <h2>Not approved</h2>
-        <p class="muted small" style="margin:0 0 14px">
-          We weren't able to approve <b>${esc(app.org_name)}</b> to sell tickets.</p>
-        ${app.reason ? `<div class="panel" style="box-shadow:none;background:var(--bg-2);margin-bottom:16px">
-          <p class="small" style="margin:0">${esc(app.reason)}</p></div>` : ""}
-        <p class="tiny muted" style="margin:0 0 18px">Your account still works for buying tickets.
-          If things have changed since, you can apply again.</p>
-        <button class="btn btn-primary btn-block" id="wAgain">Apply again</button>
-        ${signOutLink}`;
-      wireOut();
-      $("#wAgain").onclick = () => applyView();
-      return;
-    }
-
-    return applyView();
-  }
-
-  /* The application form, for an account that has one but no organisation. */
-  function applyView(msg) {
+  /* An account that exists but has no organisation yet — someone who
+     signed up before this change, or whose sign-up was interrupted.
+     They fill this in and they are straight in; nobody approves it. */
+  function setupView(msg) {
     $("#authCard").innerHTML = `
       <div style="text-align:center;margin-bottom:20px">${UI.LOGO}</div>
-      <h2>Apply to sell tickets</h2>
+      <h2>Set up your organisation</h2>
       <p class="muted small" style="margin:0 0 20px">
-        Your account is ready. Tell us who you are and we'll take a look — every organiser is checked
-        by hand before they can take money.</p>
+        Your account is ready. Give it a name and you can start selling right away.</p>
       <div class="field"><label>Organisation name</label>
         <input id="oName" placeholder="e.g. Nyali Beach Club" autocomplete="organization"></div>
       <div class="field"><label>Your name</label>
         <input id="oPerson" placeholder="Jane Mwangi" autocomplete="name"></div>
       <div class="field"><label>Phone <span class="muted small">(optional)</span></label>
         <input id="oPhone" inputmode="tel" placeholder="07XX XXX XXX" autocomplete="tel"></div>
-      <div class="field"><label>What kind of events do you put on?</label>
-        <textarea id="oNote" rows="3" placeholder="A line or two — the sort of events, roughly how often, where."></textarea></div>
       ${msg ? `<p class="tiny" style="color:var(--red);margin:0 0 12px">${esc(msg)}</p>` : ""}
-      <button class="btn btn-primary btn-block" id="oGo">Send application</button>
+      <button class="btn btn-primary btn-block" id="oGo">Create organisation</button>
       <p class="auth-switch"><a id="wOut">Sign out instead</a></p>`;
 
     $("#oName").focus();
@@ -201,13 +192,15 @@
       const btn = $("#oGo");
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
       try {
-        await PL.applyForOrg({
+        await PL.createOrg({
           org_name: $("#oName").value, name: $("#oPerson").value,
-          phone: $("#oPhone").value, note: $("#oNote").value
+          phone: $("#oPhone").value
         });
-        waitView();
+        const r = await PL.me();
+        me = r.user; org = r.org;
+        enter();
       } catch (e) {
-        applyView(e.message);
+        setupView(e.message);
       }
     };
   }
@@ -242,9 +235,282 @@
     if (tab === "payouts")  m.innerHTML = viewPayouts();
     if (tab === "settings") m.innerHTML = viewSettings();
     wire();
+    makeReadOnly();
+    guestBar();
     UI.stagger(".kpis", 55);
     UI.animate(m);
-    logoBox = $("#sLogo") ? UI.upload($("#sLogo"), { max: 512, square: true, empty: "No picture yet", kind: "logo" }) : null;
+    logoBox = (!watching && $("#sLogo"))
+      ? UI.upload($("#sLogo"), { max: 512, square: true, empty: "No picture yet", kind: "logo" }) : null;
+  }
+
+
+  /* ==========================================================
+     THE PLATFORM OWNER'S VIEW
+
+     Everything here is fetched by functions that refuse anyone
+     not in platform_admins, so an organiser opening this page
+     gets an error rather than a page full of other people's
+     money.
+     ========================================================== */
+  let pTab = "overview", pCache = {};
+
+  /* The organiser sidebar is written into the page; the platform view
+     replaces it, so keep a copy to put back. */
+  let orgNavHTML = null;
+
+  /* the organisation the owner is currently looking at, or null */
+  let watching = null;
+
+  async function platformBoot(returning) {
+    if (orgNavHTML === null) orgNavHTML = $("#nav").innerHTML;
+    $("#authScreen").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+    document.body.classList.add("platform");
+    $("#orgPill").innerHTML = `
+      <div class="org-mark" style="background:var(--ink);color:#fff">GE</div>
+      <div style="min-width:0">
+        <div class="nm">Go Events Kenya</div>
+        <div class="sb">${esc(me.name || "Platform")}</div>
+      </div>`;
+    $("#nav").innerHTML = [
+      ["overview", "Overview"], ["orgs", "Organisers"],
+      ["activity", "Activity"],
+    ].map(([k, label]) => `<button data-ptab="${k}">${label}</button>`).join("");
+    $$("#nav button").forEach((b) => (b.onclick = () => pGo(b.dataset.ptab)));
+    if (!returning) await PL.logAction("platform.signin", "Signed in to the platform view");
+    pGo(returning ? "orgs" : "overview");
+  }
+
+  async function pGo(t) {
+    pTab = t;
+    $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.ptab === t));
+    $("#main").innerHTML = `<div class="panel center"><span class="spinner"></span></div>`;
+    try {
+      if (t === "overview") pCache.overview = await PL.adminOverview();
+      if (t === "orgs")     pCache.orgs     = await PL.adminOrgs();
+      if (t === "activity") pCache.activity = await PL.adminActivity(150);
+    } catch (e) { return toast(e.message, "err"); }
+    pRender();
+  }
+
+  const ksh = (n) => "KES " + Number(n || 0).toLocaleString("en-KE");
+
+  function pRender() {
+    const m = $("#main");
+    if (pTab === "overview") m.innerHTML = pOverview();
+    if (pTab === "orgs")     m.innerHTML = pOrgs();
+    if (pTab === "activity") m.innerHTML = pActivity();
+    $$("#main [data-pact]").forEach((el) => (el.onclick = () => pHandle(el.dataset.pact, el.dataset)));
+    UI.stagger(".kpis", 55);
+    UI.animate(m);
+  }
+
+  function pOverview() {
+    const d = pCache.overview;
+    const peak = Math.max(1, ...d.daily.map((x) => x.revenue));
+    return `
+      <div class="app-head">
+        <div><h1>Everything</h1><p>Across every organiser on Go Events Kenya.</p></div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="k">Money through the platform</div>
+          <div class="v" data-count>${esc(ksh(d.gross))}</div></div>
+        <div class="kpi green"><div class="k">Yours, after Paystack</div>
+          <div class="v" data-count>${esc(ksh(d.platform_net))}</div>
+          <div class="tiny muted" style="margin-top:3px">our fee minus their ${esc(d.psp_fee_pct)}%</div></div>
+        <div class="kpi"><div class="k">Organisers</div><div class="v" data-count>${d.orgs}</div></div>
+        <div class="kpi"><div class="k">Tickets issued</div><div class="v" data-count>${d.tickets}</div></div>
+        <div class="kpi"><div class="k">Scanned in</div><div class="v" data-count>${d.scanned}</div></div>
+        <div class="kpi"><div class="k">Buyers</div><div class="v" data-count>${d.buyers}</div></div>
+        <div class="kpi"><div class="k">Live events</div>
+          <div class="v">${d.live_events}<span class="small muted" style="font-size:.95rem"> / ${d.events}</span></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Where the money goes</h3></div>
+        <div class="split-bar">
+          <span style="flex:${Math.max(1, d.organiser_share)};background:var(--line-2)" title="Organisers"></span>
+          <span style="flex:${Math.max(1, d.psp_cost)};background:var(--red)" title="Paystack"></span>
+          <span style="flex:${Math.max(1, d.platform_net)};background:var(--green)" title="You"></span>
+        </div>
+        <table class="plain">
+          <tr><td>Buyers paid</td><td class="num"><b>${esc(ksh(d.gross))}</b></td></tr>
+          <tr><td><span class="sw" style="background:var(--line-2)"></span>Organisers keep</td>
+              <td class="num">${esc(ksh(d.organiser_share))}</td></tr>
+          <tr><td><span class="sw" style="background:var(--red)"></span>Paystack keeps (${esc(d.psp_fee_pct)}%)</td>
+              <td class="num">−${esc(ksh(d.psp_cost))}</td></tr>
+          <tr><td>Our 10%</td><td class="num">${esc(ksh(d.platform_fee))}</td></tr>
+          <tr class="total"><td><span class="sw" style="background:var(--green)"></span><b>Yours to keep</b></td>
+              <td class="num"><b>${esc(ksh(d.platform_net))}</b></td></tr>
+        </table>
+        <p class="tiny muted" style="margin:12px 0 0">
+          Paystack's cut is set to ${esc(d.psp_fee_pct)}% — check your own rate with them and tell me if it differs.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Last 30 days</h3>
+          <span class="small muted">${esc(ksh(d.daily.reduce((n, x) => n + x.revenue, 0)))}</span></div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:120px">
+          ${d.daily.map((x) => `<div title="${esc(shortDate(x.d))} · ${esc(ksh(x.revenue))}"
+             style="flex:1;border-radius:4px 4px 0 0;background:${x.revenue ? "var(--orange)" : "var(--card-2)"};
+             height:${Math.max(3, Math.round((x.revenue / peak) * 100))}%"></div>`).join("")}
+        </div>
+      </div>`;
+  }
+
+  function pOrgs() {
+    const rows = pCache.orgs;
+    if (!rows.length) return `<div class="app-head"><div><h1>Organisers</h1></div></div>
+      <div class="empty"><h3>Nobody yet</h3><p>Approved organisers appear here.</p></div>`;
+    return `
+      <div class="app-head">
+        <div><h1>Organisers</h1><p>${rows.length} on the platform, biggest first.</p></div>
+      </div>
+      ${rows.map((o) => `
+        <div class="panel">
+          <div class="panel-head">
+            <div style="min-width:0">
+              <h3 style="margin-bottom:2px">${esc(o.name)}</h3>
+              <div class="small muted"><span class="code">${esc(o.handle || "—")}</span>
+                · ${esc(o.owner || "—")} · ${esc(o.email || "no email")}${o.phone ? " · " + esc(o.phone) : ""}</div>
+            </div>
+            <button class="btn btn-soft btn-sm" data-pact="viewas" data-id="${o.id}"
+              data-name="${esc(o.name)}">View as</button>
+          </div>
+          <div class="kpis" style="margin:0 0 12px">
+            <div class="kpi"><div class="k">They took</div><div class="v">${esc(ksh(o.gross))}</div></div>
+            <div class="kpi green"><div class="k">Our fee</div><div class="v">${esc(ksh(o.our_fee))}</div></div>
+            <div class="kpi"><div class="k">Events</div><div class="v">${o.live} / ${o.events}</div></div>
+            <div class="kpi"><div class="k">Tickets</div><div class="v">${o.scanned} / ${o.tickets}</div></div>
+          </div>
+          <div class="tiny muted">
+            Joined ${esc(shortDate(o.created_at))}${o.last_seen ? " · last active " + esc(ago(o.last_seen)) : ""}
+            ${o.payout_till ? " · payout to " + esc(o.payout_till) : " · no payout number set"}
+          </div>
+        </div>`).join("")}`;
+  }
+
+  const ACTION_LABEL = {
+    "platform.signin": "You signed in",
+    "platform.view_as": "You viewed an organiser",
+    "platform.view_as_end": "You stopped viewing",
+    "organiser.created": "Created an organisation",
+    "organiser.applied": "Applied to sell",
+    "organiser.approved": "Approved",
+    "organiser.rejected": "Turned down",
+    "organiser.signin": "Signed in",
+    "event.created": "Created an event",
+    "event.published": "Published an event",
+    "event.unpublished": "Unpublished an event",
+    "order.started": "Started an order",
+    "order.paid": "Order paid",
+    "order.failed": "Order failed",
+    "ticket.scanned": "Scanned a ticket",
+  };
+
+  function pActivity() {
+    const rows = pCache.activity;
+    if (!rows.length) return `<div class="app-head"><div><h1>Activity</h1></div></div>
+      <div class="empty"><h3>Nothing yet</h3></div>`;
+    return `
+      <div class="app-head">
+        <div><h1>Activity</h1><p>Everything that has happened, newest first.</p></div>
+        <button class="btn btn-soft btn-sm" data-pact="refresh">Refresh</button>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden">
+        ${rows.map((r) => `
+          <div class="feed-row">
+            <span class="feed-dot ${esc((r.action || "").split(".")[0])}"></span>
+            <div style="min-width:0;flex:1">
+              <div class="feed-what">${esc(ACTION_LABEL[r.action] || r.action)}
+                ${r.detail ? `<span class="muted">— ${esc(r.detail)}</span>` : ""}</div>
+              <div class="tiny muted">
+                ${esc(r.org || "—")}${r.actor ? " · " + esc(r.actor) : ""}</div>
+            </div>
+            <div class="tiny muted" style="flex:none;white-space:nowrap">${esc(ago(r.at))}</div>
+          </div>`).join("")}
+      </div>`;
+  }
+
+  async function pHandle(act, d) {
+    if (act === "refresh") return pGo(pTab);
+    if (act === "viewas")  return startViewing(d.id, d.name);
+  }
+
+  /* ==========================================================
+     VIEW AS ORGANISER
+
+     The owner sees the organiser's own dashboard, exactly as the
+     organiser sees it, and can change nothing.  There is no
+     password involved and nothing is borrowed from their account:
+     the database grants the owner permission to read these rows
+     and no permission at all to write them, so this holds even if
+     somebody edits the page in front of them.
+     ========================================================== */
+  async function startViewing(id, name) {
+    const btn = $(`[data-pact="viewas"][data-id="${id}"]`);
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+    try {
+      watching = await PL.viewAsOrg(id);
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = "View as"; }
+      return toast(e.message, "err");
+    }
+    org = watching;
+    document.body.classList.remove("platform");
+    document.body.classList.add("guest");
+    $("#nav").innerHTML = orgNavHTML;
+    $$("#nav button").forEach((b) => (b.onclick = () => go(b.dataset.tab)));
+    paintPill();
+    cache = {};
+    go("home");
+  }
+
+  async function stopViewing() {
+    const wasName = watching && watching.name;
+    await PL.stopViewing();
+    watching = null; org = null; cache = {};
+    document.body.classList.remove("guest");
+    $("#guestBar") && $("#guestBar").remove();
+    pCache = {};
+    await platformBoot(true);
+    toast("Back to the platform view — " + wasName + " was not changed.", "ok");
+  }
+
+  /* The bar across the top that makes it impossible to forget whose
+     screen this is. */
+  function guestBar() {
+    if (!watching) { $("#guestBar") && $("#guestBar").remove(); return; }
+    let bar = $("#guestBar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "guestBar";
+      bar.className = "guest-bar";
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+    bar.innerHTML = `
+      <span class="guest-eye" aria-hidden="true"></span>
+      <span>You are looking at <b>${esc(watching.name)}</b> as a guest.
+        <span class="guest-note">Nothing on this screen can be changed, and the visit is in the activity log.</span></span>
+      <button class="btn btn-sm" id="guestOut">Stop viewing</button>`;
+    $("#guestOut").onclick = stopViewing;
+  }
+
+  /* Strip out everything that would change something.  The database
+     refuses these anyway; taking them off the screen is so the owner is
+     never left wondering why a button did nothing. */
+  const GUEST_SAFE = ["go-orders", "copy-link", "export"];
+  function makeReadOnly() {
+    if (!watching) return;
+    $$("#main [data-act]").forEach((el) => {
+      if (!GUEST_SAFE.includes(el.dataset.act)) el.remove();
+    });
+    $$("#main input, #main select, #main textarea").forEach((el) => {
+      if (el.type === "search" || el.id === "oSearch" || el.id === "oEvent") return;
+      el.disabled = true;
+    });
+    $$("#main .upload").forEach((el) => el.remove());
   }
 
   /* ==========================================================
@@ -270,6 +536,7 @@
         <div class="kpi"><div class="k">Live events</div><div class="v">${d.live_events}<span class="small muted" style="font-size:.95rem"> / ${d.total_events}</span></div></div>
       </div>
 
+      ${d.daily.length ? `
       <div class="panel">
         <div class="panel-head"><h3>Sales, last 30 days</h3>
           <span class="small muted">${esc(amount(d.daily.reduce((n, x) => n + x.revenue, 0), cur))}</span></div>
@@ -281,7 +548,15 @@
         <div style="display:flex;justify-content:space-between;margin-top:8px" class="tiny muted">
           <span>${esc(shortDate(d.daily[0].d))}</span><span>${esc(shortDate(d.daily[d.daily.length - 1].d))}</span>
         </div>
-      </div>
+      </div>` : ""}
+
+      ${d.total_events ? "" : `
+      <div class="panel center" style="padding:34px 22px">
+        <h3 style="margin:0 0 6px">Nothing here yet</h3>
+        <p class="muted small" style="margin:0 0 18px">Put your first event up and it goes live on the
+          site straight away.</p>
+        <button class="btn btn-primary" data-act="new-event">Create your first event</button>
+      </div>`}
 
       ${d.by_event.length ? `
       <div class="panel">
