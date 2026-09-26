@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Discover events — Go Events Kenya</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="site-head" id="siteHead"></header>
+
+<section style="padding:52px 0 0">
+  <div class="wrap">
+    <div class="section-head left" style="margin-bottom:26px">
+      <h2 class="title">What's on</h2>
+      <p>Every live event on Go Events Kenya, from every organiser.</p>
+    </div>
+
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:22px">
+      <div class="search-bar">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+        <input id="q" type="search" placeholder="Event, venue or town…" autocomplete="off">
+      </div>
+    </div>
+    <div class="chip-row" id="cats"></div>
+  </div>
+</section>
+
+<section style="padding:0 0 84px">
+  <div class="wrap">
+    <div id="grid"><div class="panel center"><span class="spinner"></span> Loading events…</div></div>
+  </div>
+</section>
+
+<footer class="site-foot" id="siteFoot"></footer>
+
+<script src="assets/js/vendor/supabase.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/discover.js"></script>
+</body>
+</html>

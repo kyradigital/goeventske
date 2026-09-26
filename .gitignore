@@ -1,0 +1,13 @@
+# Keep the key checklists off a public repository.
+# They name your Daraja, Paystack and Resend setup and belong on your machine.
+MPESA-SETUP.md
+RESEND-SETUP.md
+PAYSTACK-SETUP.md
+
+# the full-size logo source, not used by the site
+goevents.png
+
+# local clutter
+.DS_Store
+Thumbs.db
+desktop.ini
