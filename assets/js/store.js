@@ -113,16 +113,9 @@
 
     let info = await rpc("me");
 
-    /* Signed in, but no organisation — they confirmed an email after signing up.
-       Finish what sign-up started. */
-    if (!info) {
-      const waiting = recall();
-      if (waiting && waiting.org_name) {
-        await rpc("create_org", { p_name: waiting.org_name, p_person: waiting.name || "Organiser" });
-        forget();
-        info = await rpc("me");
-      }
-    }
+    /* Signed in with no organisation: either they are waiting on approval, or
+       they have not applied yet. Either way the page, not this file, decides
+       what to show them. */
     if (!info) throw new Error("NEEDS_ORG");
     mine = info;
     return mine;
@@ -166,27 +159,32 @@
         boom(error);
       }
       /* If the project asks people to confirm their email there is no session
-         yet, so the organisation cannot be created until they come back. Keep
-         the name and say plainly what happens next. */
+         yet, so the application cannot be filed until they come back. */
       remember({ org_name, name });
-      if (!data.session)
-        throw new Error("CONFIRM_EMAIL");
+      if (!data.session) throw new Error("CONFIRM_EMAIL");
 
       mine = null;
-      await rpc("create_org", { p_name: org_name, p_person: name || "Organiser" });
-      forget();
-      const info = await whoami();
-      return { user: info.user, org: info.org };
+      return { pending: true };
     },
 
-    /* Naming the organisation after the fact, for an account that has none. */
-    async createOrg(org_name, name) {
+    /* Selling tickets is by approval, so this asks rather than creates.
+       No organisation exists until the platform owner says yes. */
+    async applyForOrg({ org_name, name, phone, note }) {
       if (!String(org_name || "").trim()) throw new Error("What is the organisation called?");
-      await rpc("create_org", { p_name: org_name, p_person: name || "Organiser" });
+      if (!String(name || "").trim()) throw new Error("We need your name.");
+      await rpc("apply_for_org", {
+        p_org_name: org_name, p_person: name,
+        p_phone: phone || null, p_note: note || null
+      });
       forget();
-      mine = null;
-      const info = await whoami();
-      return { user: info.user, org: info.org };
+      return { status: "pending" };
+    },
+
+    /* null when they have never applied */
+    async myApplication() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return null;
+      return rpc("my_application");
     },
 
     async signOut() {
@@ -258,17 +256,16 @@
       return r.token;
     },
 
-    /* Ask Safaricom to put the PIN prompt on the buyer's handset. The amount is
-       not sent from here — the Edge Function reads it off the order row. */
-    async payByMpesa(reference, phone) {
-      const { data, error } = await sb.functions.invoke("mpesa-stk", {
-        body: { reference, phone }
+    /* Open a Paystack checkout for an order. The amount is not sent from here —
+       the Edge Function reads it off the order row. */
+    async payForOrder(reference) {
+      const { data, error } = await sb.functions.invoke("paystack-init", {
+        body: { reference }
       });
       if (error) {
-        /* an Edge Function's error body carries the sentence worth showing */
         let msg = "";
         try { msg = (await error.context.json()).error; } catch (e) { /* no body */ }
-        throw new Error(msg || "Could not reach M-Pesa. Try again in a moment.");
+        throw new Error(msg || "Could not reach the payment page. Try again in a moment.");
       }
       return data;
     },

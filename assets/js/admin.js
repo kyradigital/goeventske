@@ -18,7 +18,8 @@
       <div style="text-align:center;margin-bottom:22px">${UI.LOGO}</div>
       <h2>${signup ? "Start selling tickets" : "Welcome back"}</h2>
       <p class="muted small" style="margin:0 0 22px">
-        ${signup ? "Free to set up. You're only charged when a ticket sells." : "Sign in to your organiser dashboard."}</p>
+        ${signup ? "Tell us about your events. We check every organiser by hand before they can sell."
+                 : "Sign in to your organiser dashboard."}</p>
 
       ${signup ? `
         <div class="field"><label>Organisation name</label>
@@ -26,17 +27,21 @@
       <div class="field"><label>${signup ? "Your name" : "Email"}</label>
         <input id="${signup ? "aName" : "aEmail"}" placeholder="${signup ? "Jane Mwangi" : "you@example.com"}"
                type="${signup ? "text" : "email"}" autocomplete="${signup ? "name" : "email"}"></div>
-      ${signup ? `<div class="field"><label>Email</label>
+      ${signup ? `<div class="field"><label>Phone <span class="muted small">(optional)</span></label>
+          <input id="aPhone" inputmode="tel" placeholder="07XX XXX XXX" autocomplete="tel"></div>
+        <div class="field"><label>What kind of events do you put on?</label>
+          <textarea id="aNote" rows="3" placeholder="A line or two — the sort of events, roughly how often, where."></textarea></div>
+        <div class="field"><label>Email</label>
           <input id="aEmail" type="email" placeholder="you@example.com" autocomplete="email"></div>` : ""}
       <div class="field"><label>Password</label>
         <input id="aPass" type="password" placeholder="${signup ? "At least 8 characters" : "••••••••"}"
                autocomplete="${signup ? "new-password" : "current-password"}"></div>
 
-      <button class="btn btn-primary btn-block btn-lg" id="aGo">${signup ? "Create my account" : "Sign in"}</button>
+      <button class="btn btn-primary btn-block btn-lg" id="aGo">${signup ? "Apply to sell tickets" : "Sign in"}</button>
 
       <p class="auth-switch">
-        ${signup ? "Already selling with us?" : "New here?"}
-        <a id="aSwitch">${signup ? "Sign in" : "Create an account"}</a>
+        ${signup ? "Already selling with us?" : "Want to sell tickets?"}
+        <a id="aSwitch">${signup ? "Sign in" : "Apply for an account"}</a>
       </p>
 
 `;
@@ -63,16 +68,20 @@
     const btn = $("#aGo");
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
     try {
-      const r = await PL.signUp({
+      await PL.signUp({
         org_name: $("#aOrg").value, name: $("#aName").value,
         email: $("#aEmail").value, password: $("#aPass").value
       });
-      me = r.user; org = r.org;
-      enter();
-      toast("You're in. Create your first event.", "ok");
+      /* the account exists; now ask permission to sell with it */
+      await PL.applyForOrg({
+        org_name: $("#aOrg").value, name: $("#aName").value,
+        phone: $("#aPhone") ? $("#aPhone").value : "",
+        note: $("#aNote") ? $("#aNote").value : ""
+      });
+      waitView();
     } catch (e) {
       if (e.message === "CONFIRM_EMAIL") return confirmView($("#aEmail").value.trim());
-      btn.disabled = false; btn.textContent = "Create my account";
+      btn.disabled = false; btn.textContent = "Apply to sell tickets";
       toast(e.message, "err");
     }
   }
@@ -114,42 +123,91 @@
       me = r.user; org = r.org;
       enter();
     } catch (e) {
-      /* Signed in, but the account has no organisation — this happens when
-         somebody confirms their email on a different device from the one they
-         signed up on. Ask for the name rather than sending them back to a
-         sign-in box they are already past. */
-      if (e.message === "NEEDS_ORG") return orgView();
+      /* Signed in, but no organisation: they are waiting on a decision, were
+         turned down, or never finished applying. */
+      if (e.message === "NEEDS_ORG") return waitView();
       authView(qs("signup") ? "signup" : "signin");
     }
   })();
 
-  function orgView() {
+  async function waitView() {
+    let app = null;
+    try { app = await PL.myApplication(); } catch (e) { /* treat as never applied */ }
+
+    const signOutLink = `<p class="auth-switch"><a id="wOut">Sign out</a></p>`;
+    const wireOut = () => {
+      $("#wOut").onclick = async () => { await PL.signOut(); location.reload(); };
+    };
+
+    if (app && app.status === "pending") {
+      $("#authCard").innerHTML = `
+        <div style="text-align:center;margin-bottom:20px">${UI.LOGO}</div>
+        <div class="await-mark"><span></span></div>
+        <h2 class="center">Waiting on approval</h2>
+        <p class="muted small center" style="margin:0 0 18px">
+          Your application for <b>${esc(app.org_name)}</b> is with us. Every organiser is checked by
+          hand, so this usually takes a day or so. You'll get an email either way.</p>
+        <div class="panel" style="box-shadow:none;background:var(--bg-2)">
+          <p class="tiny muted" style="margin:0">Applied ${esc(ago(app.created_at))}. Nothing more to do —
+            you can close this page.</p>
+        </div>
+        ${signOutLink}`;
+      return wireOut();
+    }
+
+    if (app && app.status === "rejected") {
+      $("#authCard").innerHTML = `
+        <div style="text-align:center;margin-bottom:20px">${UI.LOGO}</div>
+        <h2>Not approved</h2>
+        <p class="muted small" style="margin:0 0 14px">
+          We weren't able to approve <b>${esc(app.org_name)}</b> to sell tickets.</p>
+        ${app.reason ? `<div class="panel" style="box-shadow:none;background:var(--bg-2);margin-bottom:16px">
+          <p class="small" style="margin:0">${esc(app.reason)}</p></div>` : ""}
+        <p class="tiny muted" style="margin:0 0 18px">Your account still works for buying tickets.
+          If things have changed since, you can apply again.</p>
+        <button class="btn btn-primary btn-block" id="wAgain">Apply again</button>
+        ${signOutLink}`;
+      wireOut();
+      $("#wAgain").onclick = () => applyView();
+      return;
+    }
+
+    return applyView();
+  }
+
+  /* The application form, for an account that has one but no organisation. */
+  function applyView(msg) {
     $("#authCard").innerHTML = `
-      <div style="text-align:center;margin-bottom:22px">${UI.LOGO}</div>
-      <h2>One last thing</h2>
-      <p class="muted small" style="margin:0 0 22px">
-        Your account is confirmed. What is the organisation selling the tickets called?</p>
+      <div style="text-align:center;margin-bottom:20px">${UI.LOGO}</div>
+      <h2>Apply to sell tickets</h2>
+      <p class="muted small" style="margin:0 0 20px">
+        Your account is ready. Tell us who you are and we'll take a look — every organiser is checked
+        by hand before they can take money.</p>
       <div class="field"><label>Organisation name</label>
         <input id="oName" placeholder="e.g. Nyali Beach Club" autocomplete="organization"></div>
       <div class="field"><label>Your name</label>
         <input id="oPerson" placeholder="Jane Mwangi" autocomplete="name"></div>
-      <button class="btn btn-primary btn-block" id="oGo">Finish setting up</button>
-      <p class="auth-switch"><a id="oOut">Sign out instead</a></p>`;
+      <div class="field"><label>Phone <span class="muted small">(optional)</span></label>
+        <input id="oPhone" inputmode="tel" placeholder="07XX XXX XXX" autocomplete="tel"></div>
+      <div class="field"><label>What kind of events do you put on?</label>
+        <textarea id="oNote" rows="3" placeholder="A line or two — the sort of events, roughly how often, where."></textarea></div>
+      ${msg ? `<p class="tiny" style="color:var(--red);margin:0 0 12px">${esc(msg)}</p>` : ""}
+      <button class="btn btn-primary btn-block" id="oGo">Send application</button>
+      <p class="auth-switch"><a id="wOut">Sign out instead</a></p>`;
 
     $("#oName").focus();
-    $("#oName").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#oGo").click(); });
-    $("#oOut").onclick = async () => { await PL.signOut(); location.reload(); };
+    $("#wOut").onclick = async () => { await PL.signOut(); location.reload(); };
     $("#oGo").onclick = async () => {
       const btn = $("#oGo");
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
       try {
-        const r = await PL.createOrg($("#oName").value, $("#oPerson").value);
-        me = r.user; org = r.org;
-        enter();
-        toast("You're in. Create your first event.", "ok");
+        await PL.applyForOrg({
+          org_name: $("#oName").value, name: $("#oPerson").value,
+          phone: $("#oPhone").value, note: $("#oNote").value
+        });
+        waitView();
       } catch (e) {
-        btn.disabled = false; btn.textContent = "Finish setting up";
-        toast(e.message, "err");
+        applyView(e.message);
       }
     };
   }
@@ -184,6 +242,8 @@
     if (tab === "payouts")  m.innerHTML = viewPayouts();
     if (tab === "settings") m.innerHTML = viewSettings();
     wire();
+    UI.stagger(".kpis", 55);
+    UI.animate(m);
     logoBox = $("#sLogo") ? UI.upload($("#sLogo"), { max: 512, square: true, empty: "No picture yet", kind: "logo" }) : null;
   }
 

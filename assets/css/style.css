@@ -117,15 +117,9 @@ img{max-width:100%;display:block}
 @media(max-width:860px){ .nav .hide-sm{display:none} .site-head .wrap{gap:14px;height:74px} .logo img{height:46px} }
 
 /* ---------- hero ---------- */
-.hero{position:relative;overflow:hidden;padding:80px 0 72px}
-.hero::before{
-  content:"";position:absolute;inset:-45% 45% auto -25%;height:820px;
-  background:radial-gradient(closest-side, rgba(242,106,27,.22), transparent 70%);pointer-events:none;
-}
-.hero::after{
-  content:"";position:absolute;inset:-15% -30% auto 52%;height:700px;
-  background:radial-gradient(closest-side, rgba(242,106,27,.12), transparent 70%);pointer-events:none;
-}
+/* No decorative washes. A ticketing product is trusted with money, and a
+   clean white banner says that better than a coloured glow does. */
+.hero{position:relative;padding:80px 0 72px;border-bottom:1px solid var(--line)}
 .hero .wrap{position:relative}
 .hero-grid{display:grid;gap:56px;grid-template-columns:1.05fr .95fr;align-items:center}
 @media(max-width:940px){ .hero-grid{grid-template-columns:1fr;gap:44px} .hero{padding:52px 0 52px} }
@@ -137,10 +131,7 @@ img{max-width:100%;display:block}
 }
 .eyebrow b{background:var(--orange-deep);color:#fff;border-radius:999px;padding:3px 9px;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
 h1.display{font-size:clamp(2.4rem,5.4vw,4.1rem);letter-spacing:-.04em;margin-bottom:20px}
-h1.display .hl{
-  background:linear-gradient(100deg,var(--orange-ink) 0%, var(--orange) 55%, #f59331 100%);
-  -webkit-background-clip:text;background-clip:text;color:transparent;white-space:nowrap;
-}
+h1.display .hl{color:var(--orange-ink);white-space:nowrap}
 .lede{font-size:1.14rem;color:var(--muted);max-width:30em;margin-bottom:30px}
 .hero-cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .hero-note{display:flex;gap:18px;flex-wrap:wrap;margin-top:24px;font-size:.85rem;color:var(--muted)}
@@ -288,13 +279,10 @@ h2.title{font-size:clamp(1.85rem,3.4vw,2.7rem);margin-bottom:16px}
 
 /* cta band */
 .band{
-  background:linear-gradient(140deg,#fff3ea,#ffffff 55%,#fdf0e6);border:1px solid var(--line);
+  background:var(--bg-2);border:1px solid var(--line);
   border-radius:26px;padding:56px 44px;text-align:center;position:relative;overflow:hidden;
 }
-.band::before{
-  content:"";position:absolute;inset:auto -10% -65% 25%;height:440px;
-  background:radial-gradient(closest-side, rgba(242,106,27,.3), transparent 70%);
-}
+
 .band > *{position:relative}
 .band h2{font-size:clamp(1.8rem,3.4vw,2.6rem);margin-bottom:14px}
 .band p{color:var(--muted);max-width:34em;margin:0 auto 28px}
@@ -408,8 +396,8 @@ td{padding:14px;border-top:1px solid var(--line);vertical-align:middle}
 tbody tr:hover{background:var(--card-2)}
 
 /* ---------- organiser shell ---------- */
-.app{display:grid;grid-template-columns:252px 1fr;min-height:100vh}
-@media(max-width:900px){ .app{grid-template-columns:1fr} }
+.app{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
+@media(max-width:900px){ .app{grid-template-columns:minmax(0,1fr)} }
 .side{
   background:var(--bg-2);border-right:1px solid var(--line);padding:22px 16px;
   display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh;
@@ -456,6 +444,193 @@ tbody tr:hover{background:var(--card-2)}
 .bar-row .vl{width:92px;text-align:right;font-size:.85rem;font-weight:600;flex:none}
 
 [hidden]{display:none !important}
+
+.ev-title{font-size:clamp(1.8rem,3.6vw,2.6rem);margin-bottom:10px}
+.ev-tagline{font-size:1.05rem;margin:0 0 26px}
+.buy-head{font-size:1.05rem;margin-bottom:10px}
+.panel-title{font-size:1.25rem;margin-bottom:5px}
+.ph-lg{font-size:4rem}
+
+/* the inner pages share one wrapper, so the phone rules can reach it */
+.page{padding:44px 0 84px}
+.ev-facts{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+
+.ev-cols{display:grid;gap:34px;grid-template-columns:1.25fr .95fr;align-items:start}
+.ev-hero{border-radius:var(--radius);aspect-ratio:16/9;margin-bottom:26px}
+.ev-chips{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+
+/* the bar that follows a thumb up the page */
+.buy-bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:120;display:none;
+  align-items:center;gap:12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  background:rgba(255,255,255,.96);backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);box-shadow:0 -8px 24px -14px rgba(23,23,27,.3);
+}
+.buy-bar .bb-price{flex:1;min-width:0;font-weight:700;font-size:.95rem;color:var(--ink)}
+.buy-bar .btn{flex:none;min-height:46px}
+
+/* ============================================================
+   Motion
+
+   Everything moves in the same two ways: it rises a little as it
+   arrives, and it lifts a little when you point at it. Distances
+   are small and the timing is short, because on a page about money
+   movement should feel like responsiveness, not decoration.
+   ============================================================ */
+[data-reveal]{
+  opacity:0;
+  transition:opacity .55s cubic-bezier(.22,.8,.3,1), transform .55s cubic-bezier(.22,.8,.3,1);
+  will-change:opacity, transform;
+}
+[data-reveal="up"]   {transform:translateY(18px)}
+/* a sideways start can push a wide element past the page edge, so it only
+   applies where there is room for it to come from */
+[data-reveal="left"] {transform:translateX(-22px)}
+[data-reveal="right"]{transform:translateX(22px)}
+@media(max-width:900px){
+  [data-reveal="left"],[data-reveal="right"]{transform:translateY(18px)}
+}
+[data-reveal="in"]   {transform:scale(.96)}
+[data-reveal].shown  {opacity:1;transform:none}
+
+/* hover: a card notices the cursor */
+.card,.plan,.ev-card,.float-card{
+  transition:transform .25s cubic-bezier(.22,.8,.3,1), box-shadow .25s, border-color .2s;
+}
+@media(hover:hover){
+  .card:hover,.plan:hover{transform:translateY(-4px);box-shadow:var(--shadow);border-color:var(--line-2)}
+  .ev-card:hover{transform:translateY(-5px);box-shadow:var(--shadow-lg)}
+  .ev-card:hover .ev-img img{transform:scale(1.04)}
+  .btn-primary:hover:not(:disabled){transform:translateY(-1px)}
+  .side-nav button:hover{transform:translateX(2px)}
+  .logo:hover img{transform:scale(1.03)}
+}
+.ev-img img,.logo img{transition:transform .4s cubic-bezier(.22,.8,.3,1)}
+.btn{transition:background .18s, color .18s, border-color .18s, box-shadow .22s, transform .12s}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.99)}
+.chip,.seg button,.qty button{transition:all .18s}
+
+/* the step numbers draw a line between themselves */
+.step{position:relative}
+.step::after{
+  content:"";position:absolute;left:44px;top:19px;height:2px;width:0;background:var(--line);
+  transition:width .6s .25s cubic-bezier(.22,.8,.3,1);
+}
+.step.shown::after{width:calc(100% - 52px)}
+.steps .step:last-child::after{display:none}
+@media(max-width:640px){ .step::after{display:none} }
+
+/* the mock dashboard comes alive as it scrolls in */
+.ui-chart span{transform-origin:bottom;transform:scaleY(0);transition:transform .6s cubic-bezier(.22,.8,.3,1)}
+.laptop-wrap.shown .ui-chart span{transform:scaleY(1)}
+.laptop-wrap.shown .ui-chart span:nth-child(1){transition-delay:.05s}
+.laptop-wrap.shown .ui-chart span:nth-child(2){transition-delay:.1s}
+.laptop-wrap.shown .ui-chart span:nth-child(3){transition-delay:.15s}
+.laptop-wrap.shown .ui-chart span:nth-child(4){transition-delay:.2s}
+.laptop-wrap.shown .ui-chart span:nth-child(5){transition-delay:.25s}
+.laptop-wrap.shown .ui-chart span:nth-child(6){transition-delay:.3s}
+.laptop-wrap.shown .ui-chart span:nth-child(7){transition-delay:.35s}
+.laptop-wrap.shown .ui-chart span:nth-child(8){transition-delay:.4s}
+.laptop-wrap.shown .ui-chart span:nth-child(9){transition-delay:.45s}
+.laptop-wrap.shown .ui-chart span:nth-child(10){transition-delay:.5s}
+
+.ui-row{opacity:0;transform:translateY(8px);transition:opacity .45s, transform .45s}
+.laptop-wrap.shown .ui-row{opacity:1;transform:none}
+.laptop-wrap.shown .ui-row:nth-of-type(1){transition-delay:.45s}
+.laptop-wrap.shown .ui-row:nth-of-type(2){transition-delay:.58s}
+.laptop-wrap.shown .ui-row:nth-of-type(3){transition-delay:.71s}
+
+/* the two cards that float beside it drift in last, then breathe */
+.float-card{opacity:0;transform:translateY(10px) scale(.96);transition:opacity .5s, transform .5s}
+.laptop-wrap.shown .float-card{opacity:1;transform:none}
+.laptop-wrap.shown .float-card.tl{transition-delay:.7s;animation:drift 5.5s 1.3s ease-in-out infinite}
+.laptop-wrap.shown .float-card.br{transition-delay:.85s;animation:drift 6.5s 1.7s ease-in-out infinite reverse}
+@keyframes drift{0%,100%{translate:0 0}50%{translate:0 -7px}}
+
+/* the badge on a live event has a slow pulse, so "on sale" reads as now */
+.badge.live::before{
+  content:"";width:6px;height:6px;border-radius:99px;background:currentColor;
+  display:inline-block;margin-right:6px;vertical-align:middle;
+  animation:pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* spinners, toasts and modals */
+#toast{transition:transform .32s cubic-bezier(.2,.9,.3,1), opacity .2s}
+.backdrop{animation:fade .18s ease-out both}
+.modal{animation:riseIn .28s cubic-bezier(.22,.9,.3,1) both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes riseIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+@media(max-width:640px){
+  .modal{animation:sheetUp .3s cubic-bezier(.22,.9,.3,1) both}
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+}
+
+/* the FAQ opens rather than snaps */
+.faq summary::after{transition:transform .25s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details[open] > *:not(summary){animation:fadeDown .3s ease-out both}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* nothing above happens if the machine was asked to keep still */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;scroll-behavior:auto !important;
+  }
+  [data-reveal]{opacity:1 !important;transform:none !important}
+  .ui-chart span{transform:scaleY(1) !important}
+  .ui-row,.float-card{opacity:1 !important;transform:none !important}
+}
+
+/* the "we're looking at it" mark on the waiting screen */
+.await-mark{display:grid;place-items:center;margin:0 0 14px}
+.await-mark > span{
+  width:54px;height:54px;border-radius:999px;background:var(--orange-soft);
+  border:2px solid var(--orange);position:relative;display:block;
+}
+.await-mark > span::after{
+  content:"";position:absolute;inset:-2px;border-radius:999px;
+  border:2px solid var(--orange);opacity:.55;
+  animation:ripple 2s ease-out infinite;
+}
+@keyframes ripple{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.55);opacity:0}}
+@media(prefers-reduced-motion:reduce){ .await-mark > span::after{animation:none;opacity:0} }
+
+/* ---------- checkout steps ---------- */
+.steps-dots{display:flex;gap:6px;margin-top:7px}
+.steps-dots i{width:22px;height:4px;border-radius:99px;background:var(--line-2);transition:background .2s}
+.steps-dots i.on{background:var(--orange)}
+
+.sent-note{
+  display:flex;gap:12px;align-items:center;background:var(--orange-soft);border:1px solid #f6cdb0;
+  border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:20px;color:var(--ink);
+  font-size:.92rem;line-height:1.45;
+}
+.sent-note svg{color:var(--orange-ink)}
+.sent-note b{word-break:break-all}
+
+.otp-input{
+  font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  font-size:1.6rem !important;font-weight:700;letter-spacing:.42em;text-align:center;
+  padding:14px 10px 14px 20px;          /* the extra left pad centres the tracked text */
+}
+.otp-input::placeholder{color:var(--line-2);letter-spacing:.42em}
+
+/* ---------- you're all set ---------- */
+.all-set{
+  text-align:center;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:30px 24px;margin-bottom:22px;box-shadow:var(--shadow);
+}
+.all-set .tick{
+  width:62px;height:62px;border-radius:999px;background:var(--green-soft);color:var(--green);
+  display:grid;place-items:center;margin:0 auto 14px;
+  animation:pop .45s cubic-bezier(.2,1.5,.4,1) both;
+}
+.all-set h2{font-size:1.6rem;margin-bottom:6px}
+.all-set p{margin:0;color:var(--text-2);font-size:.96rem;line-height:1.55}
+@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){ .all-set .tick{animation:none} }
 
 /* ---------- picture upload ---------- */
 .upload{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
@@ -580,7 +755,7 @@ tbody tr:hover{background:var(--card-2)}
 .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);position:relative;overflow:hidden}
 .auth-wrap::before{
   content:"";position:absolute;inset:-30% 30% auto -20%;height:700px;
-  background:radial-gradient(closest-side, rgba(242,106,27,.18), transparent 70%);
+  background:none;
 }
 .auth-card{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow-lg);padding:34px;width:100%;max-width:420px;position:relative}
 .auth-card h2{font-size:1.5rem;margin-bottom:6px}
@@ -589,96 +764,173 @@ tbody tr:hover{background:var(--card-2)}
 
 /* ============================================================
    Phones
-   The site is used standing at a gate, one-handed, on a small
-   screen in daylight. Everything below is for that.
+
+   A 390px screen is not a small desktop. Desktop spacing and type
+   here means three swipes to reach a button. So on a phone the
+   scale comes DOWN — tighter sections, smaller headings, less
+   padding — while the things a thumb has to hit stay big.
    ============================================================ */
 @media(max-width:640px){
-  /* a comfortable gutter, and never a sideways scroll */
-  html,body{overflow-x:hidden}
-  .wrap,.wrap-sm{padding:0 16px}
+  body{font-size:15px;line-height:1.55}
+  .wrap,.wrap-sm{padding:0 18px}
 
-  h1{font-size:clamp(1.6rem,7vw,2rem)}
-  h2{font-size:clamp(1.35rem,6vw,1.7rem)}
-  .section-head p,.hero p{font-size:1rem}
+  /* type: one step down across the board */
+  h1{font-size:1.65rem;line-height:1.2}
+  h2{font-size:1.3rem}
+  h3{font-size:1.05rem}
+  h4{font-size:.95rem}
+  .ev-title{font-size:1.5rem;margin-bottom:6px}
+  .ev-tagline{font-size:.95rem;margin:0 0 18px}
+  .buy-head,.panel-title{font-size:1.05rem}
+  .ph-lg{font-size:2.6rem}
+  .small{font-size:.85rem}
+  .tiny{font-size:.76rem}
 
-  /* anything you tap is at least 44px tall */
-  .btn{min-height:46px;padding:12px 18px}
-  .btn-sm{min-height:40px;padding:10px 15px}
+  /* space: roughly half of the desktop rhythm */
+  section{padding:40px 0}
+  .hero{padding:30px 0 34px}
+  .section-head{margin-bottom:24px}
+  .section-head p{font-size:.95rem}
+  .panel{padding:16px 15px;border-radius:14px}
+  .panel + .panel{margin-top:12px}
+  .panel-head{margin-bottom:12px}
+
+  /* header: a logo and one action, not a banner */
+  .site-head .wrap{height:60px;gap:12px}
+  .logo img,.site-head .logo img{height:34px}
+  .nav{gap:8px}
+  .nav a.btn{font-size:.82rem;padding:10px 15px;min-height:42px}
+
+  /* thumbs still get big targets */
+  .btn{min-height:46px;padding:12px 18px;font-size:.9rem}
+  .btn-sm{min-height:40px;padding:9px 14px;font-size:.82rem}
+  .btn-lg{font-size:.95rem;padding:14px 20px}
   .btn-block,.btn-lg{width:100%}
   .icon-btn{width:40px;height:40px}
-  .side-nav button{padding:13px 12px}
-  input,select,textarea{min-height:46px}
+  input,select,textarea{min-height:46px;padding:11px 13px}
+  .field{margin-bottom:13px}
+  .field label{font-size:.8rem;margin-bottom:5px}
+  .chip{min-height:40px;padding:9px 14px;display:inline-flex;align-items:center;font-size:.82rem}
+  .qty button{width:42px;height:42px;font-size:1.15rem}
+  .search-bar{padding:6px 14px;min-height:46px}
+  .search-bar input{font-size:16px}
+  .back-link{display:inline-flex;align-items:center;min-height:40px}
 
-  /* stacked buttons, full width, so nothing is a thumb-stretch */
-  .hero-cta,.band > div,.app-head{flex-direction:column;align-items:stretch}
-  .hero-cta .btn,.band .btn,.app-head .btn{width:100%}
-  .app-head{gap:12px}
+  /* one column everywhere it matters */
+  .hero-cta,.band > div{flex-direction:column;align-items:stretch}
+  .hero-cta .btn,.band .btn{width:100%}
+  .app-head{flex-direction:column;align-items:stretch;gap:10px}
+  .app-head .btn{width:100%}
+  .app-head h1{font-size:1.45rem}
+  .steps,.cards,.price-grid{grid-template-columns:minmax(0,1fr);gap:14px}
+  .stats-strip{gap:20px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .foot-grid{grid-template-columns:minmax(0,1fr);gap:22px}
+  .row-2{grid-template-columns:minmax(0,1fr);gap:0}
 
-  .hero{padding:34px 0 40px}
-  .stats-strip{gap:18px;grid-template-columns:1fr 1fr}
-  .steps,.cards,.price-grid{grid-template-columns:1fr}
-  .foot-grid{grid-template-columns:1fr;gap:26px}
+  /* the event page */
+  .page{padding:16px 0 36px}
+  .ev-cols{grid-template-columns:minmax(0,1fr) !important;gap:16px}
+  #buyBox{position:static !important;top:auto !important}
+  /* a shorter banner: generated art earns less room than a real poster */
+  .ev-hero{aspect-ratio:2.1/1;border-radius:14px;margin-bottom:16px}
+  .ph-lg{font-size:2.2rem}
+  .ev-chips{gap:7px;margin-bottom:10px}
+  .badge,.by-org{font-size:.72rem;padding:4px 9px}
+  .by-org{padding:3px 10px 3px 3px}
+  .by-org img,.by-org i{width:20px;height:20px}
+  .ev-facts{gap:11px}
+  .back-link{margin-bottom:8px !important}
 
-  /* the dashboard: one column, and the tab strip scrolls across the top */
-  .side{flex-direction:row;flex-wrap:wrap;gap:14px;padding:14px 16px;align-items:center}
-  .side .logo img{height:40px}
+  .buy-bar{display:flex}
+  body.has-buy-bar{padding-bottom:78px}
+
+  /* the dashboard: tabs across the top, one column below */
+  .app-main,.side{min-width:0}
+  .side{
+    flex-direction:row;flex-wrap:wrap;gap:10px;padding:10px 16px 8px;align-items:center;
+    position:sticky;top:0;z-index:60;background:var(--bg-2);border-bottom:1px solid var(--line);
+  }
+  .side > *{min-width:0}
+  .side .logo{flex:none;margin-right:auto}
+  /* who you are is already in the page heading — the row is worth more */
+  .side .org-pill{display:none}
+  .side .logo img{height:32px}
   .side-nav{
     flex-direction:row;order:3;width:100%;gap:6px;
     overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
-    padding-bottom:2px;
+    padding:2px 16px 4px;margin:0 -16px;
+    /* a soft edge, so it reads as "there is more this way" */
+    -webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);
+            mask-image:linear-gradient(90deg,#000 88%,transparent);
   }
   .side-nav::-webkit-scrollbar{display:none}
-  .side-nav button{flex:none;white-space:nowrap}
+  /* the base rule stretches each button to the sidebar width; across the top
+     they size to their own label instead, and the strip scrolls */
+  .side-nav button{
+    flex:none;width:auto;white-space:nowrap;padding:10px 14px;
+    font-size:.86rem;min-height:42px;border-radius:99px;
+  }
   .side-nav button svg{display:none}
-  .side-foot{margin:0;flex-direction:row;gap:8px;order:2}
-  .side-foot .btn{width:auto;min-height:40px;padding:9px 14px;font-size:.82rem}
-  .org-pill{flex:1;min-width:0}
+  .side-foot{margin:0;flex-direction:row;gap:8px;order:1;flex:none}
+  .side-foot .btn{width:auto;min-height:42px;padding:9px 13px;font-size:.78rem}
+  .org-pill .nm,.org-pill .sb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .app-main{padding:18px 16px 44px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:18px}
+  .kpi{padding:13px 14px}
+  .kpi .v{font-size:1.1rem}
+  .kpi .k{font-size:.66rem}
 
-  .kpis{grid-template-columns:1fr 1fr;gap:11px}
-  .kpi{padding:14px 15px}
-  .kpi .v{font-size:1.15rem}
-  .panel{padding:18px 16px}
-
-  /* a wide table scrolls on its own rather than stretching the page */
-  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -15px;padding:0 15px}
+  .panel > div[style*="align-items:flex-end"]{min-width:0}
+  .bar-row .nm{width:84px}
+  .bar-row .vl{width:78px}
   .table-wrap table{min-width:560px}
 
-  /* the event page: details first, the buy box under them */
-  #cols{grid-template-columns:1fr !important;gap:22px}
-  #buyBox{position:static !important;top:auto !important}
-
-  .modal{max-width:100%;border-radius:16px}
-  .backdrop{padding:12px 10px}
-  .modal-head,.modal-body,.modal-foot{padding-left:16px;padding-right:16px}
-  .modal-foot{flex-direction:column-reverse}
+  /* modals sit at the bottom, the way a phone expects */
+  .backdrop{padding:0;align-items:flex-end}
+  .modal{
+    max-width:100%;border-radius:20px 20px 0 0;margin:0;
+    max-height:92vh;display:flex;flex-direction:column;
+  }
+  .modal-head{padding:16px 18px 14px}
+  .modal-head h3{font-size:1.15rem}
+  .modal-body{padding:16px 18px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .modal-foot{
+    padding:12px 18px calc(12px + env(safe-area-inset-bottom));
+    flex-direction:column-reverse;gap:8px;border-radius:0;
+  }
   .modal-foot .btn{width:100%}
+  .modal-foot .btn-soft{background:none;border:none;min-height:40px}
 
-  /* the odd controls that aren't .btn still have to be thumb-sized */
-  .chip{min-height:42px;padding:10px 16px;display:inline-flex;align-items:center}
-  .qty button{width:44px;height:44px;font-size:1.2rem}
-  .search-bar{padding:8px 16px;min-height:48px}
-  .search-bar input{font-size:16px}
-  .back-link,.small-link{display:inline-flex;align-items:center;min-height:42px}
-
+  .sent-note{padding:12px 14px;margin-bottom:16px;font-size:.88rem;gap:10px}
+  .otp-input{font-size:1.4rem !important;letter-spacing:.34em;padding:12px 8px 12px 16px}
   .upload{gap:12px}
-  .upload-pv{width:88px;height:88px}
+  .upload-pv{width:80px;height:80px}
 
-  .qr{width:min(74vw,220px);height:min(74vw,220px)}
-  .stub-mid{flex-direction:column;align-items:center;text-align:center}
+  /* the ticket */
+  .all-set{padding:22px 18px;margin-bottom:16px}
+  .all-set .tick{width:52px;height:52px;margin-bottom:10px}
+  .all-set h2{font-size:1.35rem}
+  .all-set p{font-size:.9rem}
+  .qr{width:min(70vw,240px);height:min(70vw,240px)}
+  .stub-mid{flex-direction:column;align-items:center;text-align:center;gap:14px;padding:18px}
+  .stub-top{padding:16px 18px}
   .stub-info{width:100%}
 
-  #toast{left:16px;right:16px;bottom:16px;transform:translateY(150%);max-width:none}
+  #toast{left:16px;right:16px;bottom:16px;transform:translateY(160%);max-width:none}
   #toast.show{transform:translateY(0)}
 }
 
-@media(max-width:400px){
-  .stats-strip,.kpis{grid-template-columns:1fr}
+@media(max-width:380px){
+  .stats-strip,.kpis{grid-template-columns:minmax(0,1fr)}
+  .wrap,.wrap-sm{padding:0 14px}
 }
 
 /* a phone held sideways at the gate */
 @media(max-height:520px) and (orientation:landscape){
-  .hero{padding:26px 0}
+  .hero{padding:24px 0}
   .side{position:static;height:auto}
+  .modal{max-height:96vh}
 }
 
 @media print{

@@ -46,6 +46,8 @@
     }
 
     grid.innerHTML = `<div class="ev-grid">${rows.map(card).join("")}</div>`;
+    UI.stagger("#grid .ev-grid", 55);
+    UI.animate(grid);
   }
 
   function card(e) {

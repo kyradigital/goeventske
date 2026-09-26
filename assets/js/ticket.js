@@ -16,7 +16,7 @@
   function lookup(msg) {
     view.innerHTML = `
       <div class="panel" style="max-width:440px;margin:0 auto">
-        <h2 style="font-size:1.3rem;margin-bottom:6px">Find my ticket</h2>
+        <h2 class="panel-title">Find my ticket</h2>
         <p class="muted small" style="margin:0 0 18px">Type the reference from your confirmation email — it looks like <span class="code">GEA1B2C3</span>.</p>
         ${msg ? `<p class="small" style="color:var(--red);margin:0 0 14px">${esc(msg)}</p>` : ""}
         <div class="field"><label>Order reference</label><input id="refIn" placeholder="GEA1B2C3" autocomplete="off"></div>
@@ -36,8 +36,8 @@
       if (Date.now() - started > 120000) {          // two minutes is long enough
         clearInterval(polling);
         const w = $("#waiting");
-        if (w) w.innerHTML = `<h2 style="font-size:1.2rem;margin-bottom:4px">Still waiting</h2>
-          <p class="small" style="margin:0">No word from M-Pesa yet. Your order is safe under
+        if (w) w.innerHTML = `<h2 class="panel-title">Still waiting</h2>
+          <p class="small" style="margin:0">No word from the payment yet. Your order is safe under
           <b class="code">${esc(reference)}</b> — refresh this page, or ask the organiser to confirm it.</p>`;
         return;
       }
@@ -61,17 +61,19 @@
        until then this page says so plainly rather than showing an empty QR. */
     view.innerHTML = `
       ${paid ? `
-      <div class="panel" style="border-color:rgba(47,211,106,.42);background:var(--green-soft);margin-bottom:22px">
-        <div style="display:flex;align-items:center;gap:13px">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#12b76a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.7 2.6L16 9.5"/></svg>
-          <div>
-            <h2 style="font-size:1.25rem;margin-bottom:2px">You're in</h2>
-            <p class="small muted" style="margin:0">Show the QR at the gate. Screenshot it — it works with no signal.</p>
-          </div>
-        </div>
+      <div class="all-set">
+        <span class="tick">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </span>
+        <h2>You're all set!</h2>
+        <p>Your ${o.tickets.length === 1 ? "ticket is" : "tickets are"} below, and a copy is on its way to
+          <b>${esc(o.buyer_email)}</b>.</p>
+        <p class="tiny muted" style="margin:10px 0 0">Show the QR at the gate — a screenshot works with no signal.</p>
       </div>` : o.status === "failed" ? `
       <div class="panel" style="border-color:rgba(255,68,85,.45);background:var(--red-soft);margin-bottom:22px">
-        <h2 style="font-size:1.25rem;margin-bottom:4px">That payment didn't go through</h2>
+        <h2 class="panel-title">That payment didn't go through</h2>
         <p class="small" style="margin:0 0 6px">${esc(o.reason || "The prompt was cancelled or timed out.")}
           Nothing was taken. Start again from the event page and we'll send a fresh prompt.</p>
         <a class="btn btn-primary btn-sm" href="${esc(o.event ? "event.html?e=" + o.event.slug : "discover.html")}">Try again</a>
@@ -80,14 +82,14 @@
         <div style="display:flex;align-items:center;gap:13px">
           <span class="spinner" style="flex:none"></span>
           <div>
-            <h2 style="font-size:1.25rem;margin-bottom:2px">Check your phone</h2>
-            <p class="small" style="margin:0">An M-Pesa prompt is on its way. Enter your PIN and this page
-              turns into your ticket by itself — don't close it.</p>
+            <h2 class="panel-title">Waiting for your payment</h2>
+            <p class="small" style="margin:0">As soon as the payment clears, this page turns into your
+              ticket by itself — and a copy lands in your inbox. Don't close it.</p>
           </div>
         </div>
         <p class="tiny muted" style="margin:12px 0 0">
-          Order <b class="code">${esc(o.reference)}</b>. If nothing arrives, keep this reference — the
-          organiser can confirm the payment by hand.</p>
+          Order <b class="code">${esc(o.reference)}</b>. Keep this reference — if anything goes wrong the
+          organiser can look the payment up with it.</p>
       </div>`}
 
       <div id="stubs"></div>
@@ -127,11 +129,24 @@
       </div>`).join("");
 
     $$("[data-qr]").forEach((b) => drawQR(b, b.dataset.qr, b.dataset.code));
+    UI.stagger("#stubs", 90);
+    UI.animate(view);
 
     /* While the buyer is typing their PIN, ask the server every few seconds
        whether it has heard from Safaricom yet. The server decides; this page
        only redraws. It gives up after two minutes so it isn't polling forever. */
     if (!paid && o.status === "pending") waitForPayment(o.reference);
+
+    /* A small celebration the first time a buyer lands on a paid ticket.
+       Kept to once per order so a refresh isn't a party every time. */
+    if (paid) {
+      let seen = false;
+      try { seen = sessionStorage.getItem("gek.cheered." + o.reference) === "1"; } catch (e) { /* private window */ }
+      if (!seen) {
+        try { sessionStorage.setItem("gek.cheered." + o.reference, "1"); } catch (e) { /* nothing to do */ }
+        setTimeout(() => UI.confetti(), 180);
+      }
+    }
     $("#printBtn").onclick = () => window.print();
   }
 })();

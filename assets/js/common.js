@@ -249,6 +249,149 @@
       </div>`;
   }
 
+  /* ---------- confetti ----------
+     Hand-rolled on a canvas rather than pulling in a library: it is forty lines,
+     it runs once, and it removes itself. Anyone who has asked their system for
+     less motion gets none at all. */
+  function confetti(opts) {
+    const o = Object.assign({ count: 90, seconds: 2.6 }, opts);
+    try {
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    } catch (e) { /* older browser: carry on */ }
+
+    const cv = document.createElement("canvas");
+    cv.setAttribute("aria-hidden", "true");
+    cv.style.cssText = "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:500";
+    document.body.appendChild(cv);
+
+    const cx = cv.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    function size() {
+      cv.width = Math.floor(innerWidth * dpr);
+      cv.height = Math.floor(innerHeight * dpr);
+      cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    size();
+    addEventListener("resize", size);
+
+    const colours = ["#f26a1b", "#c2470a", "#ffb06b", "#0f7a3a", "#17171b", "#ffd9bd"];
+    const bits = Array.from({ length: o.count }, () => ({
+      x: innerWidth * (.2 + Math.random() * .6),
+      y: innerHeight * .28 + Math.random() * 40,
+      vx: (Math.random() - .5) * 9,
+      vy: -8 - Math.random() * 9,
+      w: 6 + Math.random() * 6,
+      h: 9 + Math.random() * 8,
+      rot: Math.random() * Math.PI,
+      spin: (Math.random() - .5) * .3,
+      colour: colours[(Math.random() * colours.length) | 0],
+    }));
+
+    const started = performance.now();
+    (function frame(now) {
+      const life = (now - started) / (o.seconds * 1000);
+      if (life >= 1) {
+        removeEventListener("resize", size);
+        cv.remove();
+        return;
+      }
+      cx.clearRect(0, 0, innerWidth, innerHeight);
+      cx.globalAlpha = life > .75 ? (1 - life) / .25 : 1;     // fade out at the end
+      for (const b of bits) {
+        b.vy += .34;                                          // gravity
+        b.vx *= .995;
+        b.x += b.vx; b.y += b.vy; b.rot += b.spin;
+        cx.save();
+        cx.translate(b.x, b.y);
+        cx.rotate(b.rot);
+        cx.fillStyle = b.colour;
+        cx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+        cx.restore();
+      }
+      requestAnimationFrame(frame);
+    })(started);
+  }
+
+  /* ---------- motion ----------
+     Two ideas only, used everywhere:
+
+       reveal   a thing rises into place the first time it is scrolled to
+       count    a number climbs to its value once it is on screen
+
+     Both are driven by IntersectionObserver, both run exactly once, and both
+     do nothing at all for anyone whose system asks for reduced motion — that
+     setting is a request, not a preference to weigh up. */
+  function motionOK() {
+    try { return !window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
+    catch (e) { return true; }
+  }
+
+  function animate(root) {
+    const scope = root || document;
+    const targets = $$("[data-reveal],[data-count]", scope);
+    if (!targets.length) return;
+
+    /* No motion, or an old browser: show everything immediately and leave. */
+    if (!motionOK() || !("IntersectionObserver" in window)) {
+      targets.forEach((el) => {
+        el.classList.add("shown");
+        if (el.hasAttribute("data-count")) el.textContent = el.getAttribute("data-count-text") || el.textContent;
+      });
+      return;
+    }
+
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        const el = e.target;
+        io.unobserve(el);
+
+        /* a group rises one after another rather than all at once */
+        const delay = Number(el.getAttribute("data-delay") || 0);
+        setTimeout(() => {
+          el.classList.add("shown");
+          if (el.hasAttribute("data-count")) countUp(el);
+        }, delay);
+      }
+    }, { rootMargin: "0px 0px -8% 0px", threshold: .12 });
+
+    targets.forEach((el) => io.observe(el));
+  }
+
+  /* Climbs to the number already written in the element, keeping whatever sits
+     around it — "KES 486,500" counts the digits and leaves the rest alone. */
+  function countUp(el) {
+    const finalText = el.textContent;
+    const m = finalText.match(/-?[\d][\d,\s]*/);
+    if (!m) return;
+    const target = Number(m[0].replace(/[,\s]/g, ""));
+    if (!isFinite(target) || target === 0) return;
+
+    const before = finalText.slice(0, m.index);
+    const after = finalText.slice(m.index + m[0].length);
+    const grouped = m[0].includes(",");
+    const ms = 900, started = performance.now();
+
+    (function step(now) {
+      const t = Math.min(1, (now - started) / ms);
+      const eased = 1 - Math.pow(1 - t, 3);                 // fast, then settles
+      const v = Math.round(target * eased);
+      el.textContent = before + (grouped ? v.toLocaleString("en-KE") : String(v)) + after;
+      if (t < 1) requestAnimationFrame(step);
+      else el.textContent = finalText;                      // land on the exact value
+    })(started);
+  }
+
+  /* Marks the children of a container so they arrive in sequence. */
+  function stagger(selector, step) {
+    $$(selector).forEach((group) => {
+      Array.from(group.children).forEach((child, i) => {
+        if (!child.hasAttribute("data-reveal")) child.setAttribute("data-reveal", "up");
+        child.setAttribute("data-delay", String(i * (step || 70)));
+      });
+    });
+  }
+
   /* ---------- chrome ---------- */
   const LOGO = `<a class="logo" href="index.html" aria-label="Go Events Kenya — home">
       <img src="assets/img/logo.png" alt="Go Events Kenya, ticketing solutions">
@@ -333,5 +476,5 @@
 
   window.UI = { $, $$, esc, money, amount, inkOn, prettyDate, shortDate, prettyTime, when, ago,
                 dayNum, monthShort, toast, qs, initials, tint, header, footer, drawQR, LOGO,
-                readImage, safeImage, upload, uploadBox, dataUrlToBlob };
+                readImage, safeImage, upload, uploadBox, dataUrlToBlob, confetti, animate, stagger, motionOK };
 })();
