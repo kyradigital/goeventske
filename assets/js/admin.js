@@ -4,7 +4,7 @@
 (function () {
   const { $, $$, esc, money, amount, when, shortDate, prettyTime, ago, toast, qs, initials, inkOn } = UI;
 
-  let me = null, org = null, tab = "home";
+  let me = null, org = null, tab = "home", myRole = "owner";
   let logoBox = null;                 // the profile-picture upload, while Settings is open
   let cache = {};
   let orderSearch = "", orderEvent = "";
@@ -104,6 +104,7 @@
       const r = await PL.signIn($("#aHandle").value, $("#aPass").value);
       me = r.user; org = r.org;
       if (r.platform_admin) return platformBoot();
+      myRole = (r.user && r.user.role) || "owner";
       PL.logAction("organiser.signin", org && org.name);
       enter();
     } catch (e) {
@@ -139,6 +140,16 @@
     }
   }
 
+  /* Door staff see one tab. Hiding the rest is a courtesy — the database
+     refuses them the underlying rows either way. */
+  function trimNavForRole() {
+    if (myRole !== "gate") return;
+    $$("#nav button").forEach((b) => {
+      if (b.dataset.tab !== "gate") b.remove();
+    });
+    tab = "gate";
+  }
+
   function enter() {
     /* somebody was sent here from the gate — put them back */
     const next = qs("next");
@@ -149,7 +160,9 @@
     $("#authScreen").classList.add("hidden");
     $("#app").classList.remove("hidden");
     paintPill();
-    go("home");
+    trimNavForRole();
+    $$("#nav button").forEach((b) => (b.onclick = () => go(b.dataset.tab)));
+    go(myRole === "gate" ? "gate" : "home");
   }
 
   /* start: already signed in? */
@@ -158,6 +171,7 @@
       const r = await PL.me();
       if (r.platform_admin) { me = r.user; return platformBoot(); }
       me = r.user; org = r.org;
+      myRole = (r.user && r.user.role) || "owner";
       enter();
     } catch (e) {
       /* Signed in, but no organisation: they are waiting on a decision, were
@@ -213,6 +227,7 @@
   $$("#nav button").forEach((b) => (b.onclick = () => go(b.dataset.tab)));
 
   async function go(t) {
+    if (tab === "gate" && t !== "gate") stopScan();
     tab = t;
     $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
     $("#main").innerHTML = `<div class="panel center"><span class="spinner"></span></div>`;
@@ -221,7 +236,6 @@
       if (t === "events")   cache.events = await PL.myEvents();
       if (t === "orders")   cache.orders = await PL.myOrders({ q: orderSearch, event_id: orderEvent });
       if (t === "gate")     cache.events = await PL.myEvents();
-      if (t === "payouts")  cache.payouts = await PL.payouts();
     } catch (e) { return toast(e.message, "err"); }
     render();
   }
@@ -232,11 +246,11 @@
     if (tab === "events")   m.innerHTML = viewEvents();
     if (tab === "orders")   m.innerHTML = viewOrders();
     if (tab === "gate")     m.innerHTML = viewGate();
-    if (tab === "payouts")  m.innerHTML = viewPayouts();
     if (tab === "settings") m.innerHTML = viewSettings();
     wire();
     makeReadOnly();
     guestBar();
+    if (tab === "settings" && $("#teamList")) paintTeam();
     UI.stagger(".kpis", 55);
     UI.animate(m);
     logoBox = (!watching && $("#sLogo"))
@@ -584,6 +598,135 @@
     };
   }
 
+  /* ==========================================================
+     THE TEAM
+
+     There is no email anywhere in this product, so people are not
+     invited — the owner creates their login and hands it to them.
+     Three roles: the owner, staff who run the events, and door
+     staff who only scan.
+     ========================================================== */
+  const ROLE_LABEL = { owner: "Owner", staff: "Staff", gate: "Door" };
+  const ROLE_NOTE = {
+    owner: "Everything, including money and settings",
+    staff: "Events, orders and the gate — not settings or the team",
+    gate:  "The scanner and the guest list only"
+  };
+
+  async function paintTeam() {
+    const box = $("#teamList");
+    if (!box) return;
+    let rows = [];
+    try { rows = await PL.team(); }
+    catch (e) { box.innerHTML = `<p class="small muted" style="margin:0">Couldn't load your team.</p>`; return; }
+
+    box.innerHTML = rows.map((m) => `
+      <div class="team-row">
+        <div class="org-mark sm" style="background:${esc(org.colour)};color:${inkOn(org.colour)}">${esc(initials(m.name || "?"))}</div>
+        <div style="min-width:0;flex:1">
+          <div class="team-nm">${esc(m.name || "—")}${m.is_you ? ` <span class="tiny muted">(you)</span>` : ""}</div>
+          <div class="tiny muted"><span class="code">${esc(m.handle)}</span> · ${esc(ROLE_NOTE[m.role] || m.role)}</div>
+        </div>
+        <span class="badge ${m.role === "owner" ? "live" : ""}">${esc(ROLE_LABEL[m.role] || m.role)}</span>
+        ${m.role !== "owner" && myRole === "owner"
+          ? `<button class="btn btn-soft btn-sm" data-act="drop-member" data-id="${esc(m.user_id)}"
+               data-name="${esc(m.name || "")}">Remove</button>` : ""}
+      </div>`).join("");
+    wire();
+  }
+
+  function dropMember(user_id, name) {
+    modal(`Remove ${name || "them"}?`, `
+      <p class="small" style="margin:0">Their login stops working straight away. Tickets they have
+        already scanned are not affected.</p>`,
+      `<button class="btn btn-soft" data-close>Cancel</button>
+       <button class="btn btn-primary" id="dropGo">Remove</button>`);
+    $("#dropGo").onclick = async () => {
+      const b = $("#dropGo");
+      b.disabled = true; b.innerHTML = '<span class="spinner"></span>';
+      try {
+        await PL.removeTeamMember(user_id);
+        $("#modalHost").innerHTML = "";
+        toast(`${name || "They"} can no longer sign in.`, "ok");
+        paintTeam();
+      } catch (e) {
+        b.disabled = false; b.textContent = "Remove";
+        toast(e.message, "err");
+      }
+    };
+  }
+
+  function addMemberModal() {
+    modal("Add someone to your team", `
+      <div class="field"><label for="tmName">Their name</label>
+        <input id="tmName" placeholder="Jane Mwangi" autocomplete="off"></div>
+
+      <div class="field"><label>What can they see?</label>
+        <div class="role-pick" id="tmRole">
+          ${["gate", "staff"].map((r, i) => `
+            <label class="role-opt${i === 0 ? " on" : ""}">
+              <input type="radio" name="tmrole" value="${r}" ${i === 0 ? "checked" : ""}>
+              <span class="role-nm">${ROLE_LABEL[r]}</span>
+              <span class="role-sub">${ROLE_NOTE[r]}</span>
+            </label>`).join("")}
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:8px"><label for="tmPass">Password for them</label>
+        <input id="tmPass" type="text" autocomplete="off" spellcheck="false" placeholder="At least 8 characters"></div>
+      <button class="btn btn-soft btn-sm" id="tmGen" type="button">Suggest one</button>
+      <p class="tiny" id="tmMsg" style="margin:12px 0 0;min-height:1em"></p>`,
+      `<button class="btn btn-soft" data-close>Cancel</button>
+       <button class="btn btn-primary" id="tmGo">Create their login</button>`);
+
+    $$("#tmRole .role-opt").forEach((l) => (l.onclick = () => {
+      $$("#tmRole .role-opt").forEach((x) => x.classList.remove("on"));
+      l.classList.add("on");
+    }));
+
+    $("#tmGen").onclick = () => {
+      const AB = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const b = new Uint8Array(12); crypto.getRandomValues(b);
+      const ch = Array.from(b, (x) => AB[x % AB.length]);
+      $("#tmPass").value = [0, 4, 8].map((i) => ch.slice(i, i + 4).join("")).join("-");
+      $("#tmPass").focus(); $("#tmPass").select();
+    };
+
+    const say = (t, bad) => {
+      const m = $("#tmMsg");
+      if (m) { m.textContent = t; m.style.color = bad ? "var(--red)" : "var(--muted)"; }
+    };
+
+    $("#tmGo").onclick = async () => {
+      const name = $("#tmName").value.trim();
+      const role = ($("#tmRole input:checked") || {}).value || "gate";
+      const password = $("#tmPass").value.trim();
+      if (name.length < 2) return say("Give them a name.", true);
+      if (password.length < 8) return say("Use at least 8 characters.", true);
+
+      const btn = $("#tmGo");
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+      say("Creating…");
+      try {
+        const r = await PL.addTeamMember({ name, role, password });
+        modal(`${r.name} is on the team`, `
+          <p class="small" style="margin:0 0 16px">
+            Give them these. They sign in on the same page you do.</p>
+          <div class="cred">
+            <div><span>Sign-in name</span><b>${esc(r.handle)}</b></div>
+            <div><span>Password</span><b class="pw">${esc(password)}</b></div>
+          </div>
+          <p class="tiny muted" style="margin:14px 0 0">
+            ${esc(ROLE_NOTE[r.role])}. You can remove them at any time.</p>`,
+          `<button class="btn btn-primary" data-close>Done</button>`);
+        paintTeam();
+      } catch (e) {
+        btn.disabled = false; btn.textContent = "Create their login";
+        say(e.message, true);
+      }
+    };
+  }
+
   const ACTION_LABEL = {
     "platform.signin": "You signed in",
     "platform.view_as": "You viewed an organiser",
@@ -724,8 +867,11 @@
       </div>
 
       <div class="kpis">
-        <div class="kpi"><div class="k">Gross sales</div><div class="v">${esc(amount(d.gross, cur))}</div></div>
-        <div class="kpi green"><div class="k">Yours after fees</div><div class="v">${esc(amount(d.net, cur))}</div>
+        <div class="kpi"><div class="k">Revenue</div><div class="v">${esc(amount(d.gross, cur))}</div>
+          <div class="tiny muted" style="margin-top:3px">what buyers paid</div></div>
+        <div class="kpi"><div class="k">Our fee</div><div class="v">${esc(amount(d.gross - d.net, cur))}</div>
+          <div class="tiny muted" style="margin-top:3px">${d.fee_pct}% of revenue</div></div>
+        <div class="kpi green"><div class="k">Yours</div><div class="v">${esc(amount(d.net, cur))}</div>
           <div class="tiny muted" style="margin-top:3px">after our ${d.fee_pct}%</div></div>
         <div class="kpi"><div class="k">Tickets sold</div><div class="v">${d.tickets_sold}</div></div>
         <div class="kpi"><div class="k">Scanned in</div><div class="v">${d.scanned}</div></div>
@@ -947,11 +1093,27 @@
         <div><h1>Gate</h1><p>Check a ticket by code, or cancel one that shouldn't work.</p></div>
       </div>
 
-      <div class="panel">
-        <div class="panel-head"><h3>Check a ticket</h3></div>
+      <div class="panel scan-panel">
+        <div class="panel-head"><h3>Scan tickets</h3>
+          <button class="btn btn-primary btn-sm" data-act="scan-start" id="scanBtn">Open the scanner</button></div>
         <p class="small muted" style="margin:0 0 14px">
-          On the night, most people just point a phone camera at the QR — it opens the gate page by itself.
-          This is for when a code has to be typed in by hand.</p>
+          Point the camera at the QR on a ticket. It admits one guest per scan and tells you
+          immediately if a code has already been used.</p>
+        <div class="scan-stage" id="scanStage" hidden>
+          <video id="scanVid" playsinline muted></video>
+          <div class="scan-frame"><i></i><i></i><i></i><i></i></div>
+          <div class="scan-flash" id="scanFlash"></div>
+          <button class="btn btn-soft btn-sm scan-stop" data-act="scan-stop">Stop</button>
+        </div>
+        <div id="scanOut" style="margin-top:14px"></div>
+        <div class="scan-tally" id="scanTally" hidden></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Check a ticket by code</h3></div>
+        <p class="small muted" style="margin:0 0 14px">
+          For when a QR will not read — a cracked screen, a printed ticket that has been through
+          the wash.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <input id="dCode" placeholder="GE-XXXXXXXX" style="flex:1;min-width:190px;text-transform:uppercase">
           <button class="btn btn-primary" data-act="check">Check</button>
@@ -972,50 +1134,181 @@
   }
 
   /* ==========================================================
-     PAYOUTS
+     THE SCANNER
+
+     Runs in this page, on the camera of whatever phone the door
+     staff are holding. Nothing is installed.
+
+     Each frame of the video is read for a QR. When one appears it
+     is spent through the database, which decides whether that
+     ticket is good — the camera only ever reports what it saw.
+     A code is ignored for a few seconds after it is read, so one
+     ticket held in front of the lens is not counted twice.
      ========================================================== */
-  function viewPayouts() {
-    const { rows, fee_pct } = cache.payouts;
-    const cur = org.currency;
-    const ready = rows.filter((r) => r.state === "ready").reduce((n, r) => n + r.net, 0);
+  let scan = { stream: null, raf: null, busy: false, seen: new Map(), admitted: 0, refused: 0 };
 
-    const label = { waiting: ["Event hasn't happened", ""], clearing: ["Clearing", "warn"], ready: ["Ready", "ok"] };
+  async function startScan() {
+    const stage = $("#scanStage"), video = $("#scanVid"), btn = $("#scanBtn");
+    if (!stage || !video) return;
 
-    return `
-      <div class="app-head">
-        <div><h1>Payouts</h1><p>Money lands 24 hours after an event finishes.</p></div>
-        <button class="btn btn-primary" data-act="withdraw">Withdraw ${esc(amount(ready, cur))}</button>
-      </div>
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return scanSay("bad", "No camera here",
+        "This browser will not give a web page the camera. Use the code box below instead.");
+    }
+    if (typeof jsQR !== "function") {
+      return scanSay("bad", "The scanner did not load",
+        "Reload the page and try again.");
+    }
 
-      <div class="kpis">
-        <div class="kpi green"><div class="k">Ready to withdraw</div><div class="v">${esc(amount(ready, cur))}</div></div>
-        <div class="kpi"><div class="k">Still clearing</div>
-          <div class="v">${esc(amount(rows.filter((r) => r.state === "clearing").reduce((n, r) => n + r.net, 0), cur))}</div></div>
-        <div class="kpi"><div class="k">Upcoming events</div>
-          <div class="v">${esc(amount(rows.filter((r) => r.state === "waiting").reduce((n, r) => n + r.net, 0), cur))}</div></div>
-      </div>
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+    try {
+      scan.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+        audio: false
+      });
+    } catch (e) {
+      btn.disabled = false; btn.textContent = "Open the scanner";
+      const why = e && e.name === "NotAllowedError"
+        ? "The camera was blocked. Allow it for this site in your browser settings, then try again."
+        : "That camera could not be opened. Use the code box below instead.";
+      return scanSay("bad", "No camera", why);
+    }
 
-      ${rows.length ? `<div class="panel"><div class="table-wrap"><table>
-        <thead><tr><th>Event</th><th>Date</th><th>Gross</th><th>Fee (${fee_pct}%)</th><th>You get</th><th>State</th></tr></thead>
-        <tbody>${rows.map((r) => `<tr>
-          <td style="font-weight:600">${esc(r.event)}</td>
-          <td class="small muted">${esc(shortDate(r.date))}</td>
-          <td>${esc(amount(r.gross, cur))}</td>
-          <td class="small muted">−${esc(amount(r.fee, cur))}</td>
-          <td><b>${esc(amount(r.net, cur))}</b></td>
-          <td><span class="badge ${label[r.state][1]}">${label[r.state][0]}</span></td>
-        </tr>`).join("")}</tbody></table></div></div>`
-        : `<div class="empty"><h3>No money in yet</h3><p>As soon as a ticket sells, it shows up here with the fee broken out.</p></div>`}
-
-      <div class="panel">
-        <div class="panel-head"><h3>Where it goes</h3></div>
-        <div class="field"><label>M-Pesa number for payouts</label>
-          <input id="payoutTill" value="${esc(org.payout_till || "")}" placeholder="07XX XXX XXX — the number that receives the money"></div>
-        <p class="tiny muted" style="margin:-6px 0 14px">Must be registered to ${esc(org.name)} or to whoever signs for it.</p>
-        <button class="btn btn-soft btn-sm" data-act="save-till">Save number</button>
-      </div>`;
+    video.srcObject = scan.stream;
+    await video.play().catch(() => {});
+    stage.hidden = false;
+    $("#scanTally").hidden = false;
+    btn.disabled = false; btn.textContent = "Scanning…";
+    scan.admitted = 0; scan.refused = 0;
+    paintTally();
+    readFrames();
   }
 
+  function stopScan() {
+    cancelAnimationFrame(scan.raf);
+    if (scan.stream) scan.stream.getTracks().forEach((t) => t.stop());
+    scan.stream = null;
+    /* stopping the tracks is not enough — the element keeps a reference and
+       some browsers leave the camera light on until it is let go */
+    const vid = $("#scanVid");
+    if (vid) { try { vid.pause(); } catch (e) { /* nothing to pause */ } vid.srcObject = null; }
+    const stage = $("#scanStage"), btn = $("#scanBtn");
+    if (stage) stage.hidden = true;
+    if (btn) { btn.disabled = false; btn.textContent = "Open the scanner"; }
+  }
+
+  function readFrames() {
+    const video = $("#scanVid");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    const tick = () => {
+      if (!scan.stream) return;
+      scan.raf = requestAnimationFrame(tick);
+      if (scan.busy || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+      /* a smaller frame decodes fast enough to feel instant on an old phone */
+      const w = 480;
+      const h = Math.round((video.videoHeight / video.videoWidth) * w) || 360;
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(video, 0, 0, w, h);
+
+      let found;
+      try {
+        found = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
+      } catch (e) { return; }
+      if (!found || !found.data) return;
+
+      const token = tokenFrom(found.data);
+      if (!token) return scanSay("bad", "Not one of ours",
+        "That code was not issued by Go Events Kenya.");
+
+      /* the same ticket held in front of the lens must not count twice */
+      const last = scan.seen.get(token) || 0;
+      if (Date.now() - last < 4000) return;
+      scan.seen.set(token, Date.now());
+
+      spend(token);
+    };
+    tick();
+  }
+
+  /* The QR carries a link to this site with the ticket's token on it.
+     Anything else is not ours. */
+  function tokenFrom(text) {
+    const raw = String(text || "").trim();
+    try {
+      const u = new URL(raw);
+      if (u.origin !== location.origin) return null;
+      const t = u.searchParams.get("t");
+      return /^[A-Za-z0-9_-]{16,}$/.test(t || "") ? t : null;
+    } catch (e) {
+      return /^[A-Za-z0-9_-]{16,}$/.test(raw) ? raw : null;
+    }
+  }
+
+  async function spend(token) {
+    scan.busy = true;
+    try {
+      const r = await PL.useTicket(token);
+      if (r && r.result === "ok") {
+        scan.admitted++;
+        flash("ok");
+        scanSay("ok", "Let them in", `${esc(r.type_name || "Ticket")} · ${esc(r.code || "")}`);
+      } else if (r && r.result === "used") {
+        scan.refused++;
+        flash("bad");
+        scanSay("warn", "Already used",
+          `This one was scanned ${r.used_at ? esc(ago(r.used_at)) : "earlier"}. Do not let them in twice.`);
+      } else if (r && r.result === "void") {
+        scan.refused++;
+        flash("bad");
+        scanSay("bad", "Cancelled ticket", "This ticket was cancelled. Do not let them in.");
+      } else if (r && r.result === "not_yours") {
+        scan.refused++;
+        flash("bad");
+        scanSay("bad", "Another organiser's ticket", "It is genuine, but not for your event.");
+      } else {
+        scan.refused++;
+        flash("bad");
+        scanSay("bad", "Not a valid ticket", "Do not let them in.");
+      }
+    } catch (e) {
+      flash("bad");
+      scanSay("bad", "Could not check it", e.message);
+    } finally {
+      paintTally();
+      setTimeout(() => { scan.busy = false; }, 700);
+    }
+  }
+
+  function flash(kind) {
+    const f = $("#scanFlash");
+    if (!f) return;
+    f.className = "scan-flash " + kind;
+    setTimeout(() => (f.className = "scan-flash"), 420);
+    if (navigator.vibrate) navigator.vibrate(kind === "ok" ? 40 : [60, 50, 60]);
+  }
+
+  function scanSay(kind, title, note) {
+    const out = $("#scanOut");
+    if (!out) return;
+    out.innerHTML = `<div class="scan-say ${esc(kind)}">
+      <b>${esc(title)}</b><span>${note || ""}</span></div>`;
+  }
+
+  function paintTally() {
+    const t = $("#scanTally");
+    if (!t) return;
+    t.innerHTML = `<span><b>${scan.admitted}</b> let in</span>
+                   <span><b>${scan.refused}</b> turned away</span>`;
+  }
+
+  addEventListener("pagehide", stopScan);
+
+  /* ==========================================================
+     PAYOUTS
+     ========================================================== */
   /* ==========================================================
      SETTINGS
      ========================================================== */
@@ -1043,17 +1336,12 @@
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h3>Your team</h3></div>
-        <p class="small muted" style="margin:0 0 14px">
-          Gate staff get a login that scans tickets and sees the guest list — never your payouts or your
-          bank details.</p>
-        <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)">
-          <div class="org-mark" style="background:${esc(org.colour)};color:${inkOn(org.colour)}">${esc(initials(me.name))}</div>
-          <div style="flex:1"><div style="font-weight:600">${esc(me.name)}</div>
-            <div class="tiny muted">${esc(me.email)}</div></div>
-          <span class="badge live">Owner</span>
-        </div>
-        <button class="btn btn-soft btn-sm" style="margin-top:14px" data-act="soon">+ Invite someone</button>
+        <div class="panel-head"><h3>Your team</h3>
+          <button class="btn btn-soft btn-sm" data-act="add-member">+ Add someone</button></div>
+        <p class="small muted" style="margin:0 0 4px">
+          Everyone gets their own sign-in name and password. Door staff can scan and see the guest
+          list; they never see what you have taken.</p>
+        <div id="teamList"><div class="center" style="padding:18px 0"><span class="spinner"></span></div></div>
       </div>
 
       <div class="panel">
@@ -1101,6 +1389,10 @@
 
   async function handle(act, d) {
     try {
+      if (act === "scan-start") return startScan();
+      if (act === "scan-stop")  return stopScan();
+      if (act === "add-member") return addMemberModal();
+      if (act === "drop-member") return dropMember(d.id, d.name);
       if (act === "new-event")  return eventModal(null);
       if (act === "edit-event") return eventModal(cache.events.find((e) => e.id === d.id));
       if (act === "go-orders")  return go("orders");
@@ -1169,8 +1461,6 @@
         return toast(r.code + " cancelled.", "ok");
       }
 
-      if (act === "withdraw")
-        return toast("Withdrawals can only be made 24 hours after the event.", "");
 
       if (act === "save-till") {
         org = await PL.saveOrg({ payout_till: $("#payoutTill").value.trim() });

@@ -294,6 +294,57 @@
       return out;
     },
 
+    /* ---------- the team ----------
+       No invitations by email, because these accounts have no email. The
+       owner makes a login, picks what it may see, and hands it over. */
+    async team() { return rpc("team_members"); },
+
+    async addTeamMember({ name, role, password }) {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) throw new Error("Your sign-in expired. Reload and sign in again.");
+
+      let res;
+      try {
+        res = await fetch(`${GEK.url}/functions/v1/org-team`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: GEK.key,
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ name, role, password })
+        });
+      } catch (e) {
+        throw new Error("Couldn't reach the server. Check your connection and try again.");
+      }
+
+      let out = {};
+      try { out = await res.json(); } catch (e) { /* nothing readable came back */ }
+      if (!res.ok || !out.ok) {
+        const why = {
+          NOT_ALLOWED: "Only the owner of this organisation can add people.",
+          NO_ORG: "You don't have an organisation yet.",
+          NEEDS_NAME: "Give them a name — two letters or more.",
+          BAD_ROLE: "Pick what they're allowed to see.",
+          TOO_SHORT: "Use at least 8 characters for the password.",
+          TOO_LONG: "That password is too long.",
+          NOT_CONFIGURED: "Team logins aren't switched on for this site yet.",
+          COULD_NOT_CREATE: out.detail || "That login couldn't be created.",
+          COULD_NOT_ADD: out.detail || "They couldn't be added to the team."
+        }[out.error];
+        throw new Error(why || `They couldn't be added (${res.status}).`);
+      }
+      return out;
+    },
+
+    async removeTeamMember(user_id) { return rpc("remove_team_member", { p_user: user_id }); },
+
+    /* what this signed-in account is allowed to do */
+    async myRole() {
+      const info = await whoami();
+      return (info.user && info.user.role) || "owner";
+    },
+
     async stopViewing() {
       const was = watching;
       watching = null;
@@ -565,25 +616,6 @@
     async cancelOrder(reference) {
       await rpc("cancel_order", { p_reference: reference });
       return { ok: true };
-    },
-
-    async payouts() {
-      const info = await whoami();
-      const fee = Number(info.org.fee_pct) / 100;
-      const evs = await rows(sb.from("events").select("id,name,date").eq("org_id", info.org.id));
-      const paid = await rows(sb.from("orders").select("event_id,total")
-        .eq("org_id", info.org.id).eq("status", "paid"));
-      const list = evs.map((e) => {
-        const gross = paid.filter((o) => o.event_id === e.id).reduce((n, o) => n + o.total, 0);
-        const over = new Date(e.date + "T23:59:59") < new Date();
-        const hours = over ? (Date.now() - new Date(e.date + "T23:59:59")) / 36e5 : 0;
-        return {
-          event_id: e.id, event: e.name, date: e.date, gross,
-          fee: Math.round(gross * fee), net: Math.round(gross * (1 - fee)),
-          state: !over ? "waiting" : hours < 24 ? "clearing" : "ready"
-        };
-      }).filter((r) => r.gross > 0);
-      return { rows: list, fee_pct: Number(info.org.fee_pct) };
     },
 
     async saveOrg(patch) {

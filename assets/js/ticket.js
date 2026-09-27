@@ -103,12 +103,18 @@
       </div>
 
       <div class="center no-print" style="margin-top:24px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-        <button class="btn btn-soft" id="printBtn">Print or save as PDF</button>
+        <button class="btn btn-primary" id="pdfBtn">Download PDF</button>
+        <button class="btn btn-soft" id="printBtn">Print</button>
         <a class="btn btn-ghost" href="discover.html">Find another event</a>
       </div>`;
 
+    const poster = UI.safeImage((o.event && o.event.poster) || "");
     $("#stubs").innerHTML = (o.tickets || []).map((t, i) => `
       <div class="stub">
+        ${poster ? `<div class="stub-art">
+          <div class="ev-art-bg" style="background-image:url('${poster.replace(/'/g, "%27")}')"></div>
+          <img src="${poster}" alt="Poster for ${esc(o.event.name)}">
+        </div>` : ""}
         <div class="stub-top">
           <div class="ev">${esc(o.event.name)}</div>
           <div class="mt">${esc(when(o.event.date))} · ${esc(prettyTime(o.event.start_time))} · ${esc(o.event.venue)}, ${esc(o.event.city)}</div>
@@ -148,5 +154,19 @@
       }
     }
     $("#printBtn").onclick = () => window.print();
+
+    /* The browser's own print-to-PDF is what makes the file. It is the one
+       route that works on every phone and desktop without shipping a PDF
+       library to every visitor, and it produces a real PDF, not a picture
+       of one. The print stylesheet lays out one ticket per page. */
+    $("#pdfBtn").onclick = () => {
+      const was = document.title;
+      /* most browsers name the PDF after the page title */
+      document.title = `Ticket ${o.reference} — ${o.event ? o.event.name : "Go Events Kenya"}`;
+      const back = () => { document.title = was; removeEventListener("afterprint", back); };
+      addEventListener("afterprint", back);
+      setTimeout(() => window.print(), 60);
+      setTimeout(back, 8000);
+    };
   }
 })();

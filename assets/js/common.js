@@ -340,22 +340,39 @@
       return;
     }
 
+    const show = (el) => {
+      if (el.classList.contains("shown")) return;
+      el.classList.add("shown");
+      if (el.hasAttribute("data-count")) countUp(el);
+    };
+
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) {
         if (!e.isIntersecting) continue;
         const el = e.target;
         io.unobserve(el);
-
         /* a group rises one after another rather than all at once */
-        const delay = Number(el.getAttribute("data-delay") || 0);
-        setTimeout(() => {
-          el.classList.add("shown");
-          if (el.hasAttribute("data-count")) countUp(el);
-        }, delay);
+        setTimeout(() => show(el), Number(el.getAttribute("data-delay") || 0));
       }
-    }, { rootMargin: "0px 0px -8% 0px", threshold: .12 });
+    }, {
+      /* Start a little BEFORE something reaches the viewport, and accept any
+         sliver of it. The old settings asked for 12% of the element to be
+         inside a viewport shrunk by 8%, which meant a tall card sitting just
+         below the fold was never seen — and on a page too short to scroll it
+         could never become visible at all. */
+      rootMargin: "200px 0px 200px 0px",
+      threshold: 0
+    });
 
     targets.forEach((el) => io.observe(el));
+
+    /* The safety net that matters: an animation must never be able to leave
+       content permanently invisible. Whatever has not revealed itself shortly
+       after load is shown anyway, whether or not the observer ever fired. */
+    clearTimeout(animate._failsafe);
+    animate._failsafe = setTimeout(() => {
+      $$("[data-reveal],[data-count]", scope).forEach(show);
+    }, 1200);
   }
 
   /* Climbs to the number already written in the element, keeping whatever sits

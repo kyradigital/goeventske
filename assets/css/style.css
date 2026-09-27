@@ -143,12 +143,28 @@ h1.display .hl{color:var(--orange-ink);white-space:nowrap}
 .hero-note span{display:flex;align-items:center;gap:7px}
 
 /* laptop showing the organiser dashboard */
-.laptop-wrap{position:relative}
-.laptop{position:relative;z-index:1;perspective:1400px}
+.laptop-wrap{position:relative;perspective:1600px}
+/* Turned three-quarters away, the way a laptop actually sits on a desk when
+   somebody shows you their screen. A flat front-on rectangle reads as a
+   screenshot; this reads as a machine in a room. */
+.laptop{
+  position:relative;z-index:1;
+  transform:rotateY(-19deg) rotateX(6deg) rotateZ(.6deg);
+  transform-style:preserve-3d;
+  transition:transform .7s cubic-bezier(.22,.8,.3,1);
+}
+.laptop-wrap.shown .laptop{transform:rotateY(-13deg) rotateX(4deg)}
 .laptop-screen{
   background:#ffffff;border:1px solid var(--line);border-radius:14px 14px 4px 4px;
-  padding:11px 11px 13px;box-shadow:var(--shadow-lg), inset 0 0 0 1px rgba(23,23,27,.04);
+  padding:11px 11px 13px;
+  box-shadow:34px 34px 70px -30px rgba(23,23,27,.45), inset 0 0 0 1px rgba(23,23,27,.04);
 }
+/* the light falling across a turned screen */
+.laptop-screen::after{
+  content:"";position:absolute;inset:0;border-radius:14px 14px 4px 4px;pointer-events:none;
+  background:linear-gradient(105deg, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 32%);
+}
+.laptop-screen{position:relative}
 .laptop-base{
   height:17px;margin:0 -9%;border-radius:0 0 7px 7px;
   background:linear-gradient(#f0ebe7,#e3dcd6 40%,#d5cdc6);
@@ -336,7 +352,7 @@ h2.title{font-size:clamp(1.85rem,3.4vw,2.7rem);margin-bottom:16px}
 .browse-top{
   position:relative;overflow:hidden;
   background:var(--ink);color:#fff;
-  padding:58px 0 66px;
+  padding:40px 0 44px;
 }
 /* a slow, very low-contrast wash — depth without a loud gradient */
 .browse-top::before{
@@ -368,8 +384,8 @@ h2.title{font-size:clamp(1.85rem,3.4vw,2.7rem);margin-bottom:16px}
 }
 .browse-title .dot{color:var(--orange)}
 .browse-sub{
-  color:rgba(255,255,255,.72);font-size:1.02rem;line-height:1.6;
-  max-width:52ch;margin:0 0 28px;
+  color:rgba(255,255,255,.72);font-size:1rem;line-height:1.55;
+  max-width:52ch;margin:0 0 20px;
 }
 .search-bar.big{
   max-width:520px;background:rgba(255,255,255,.07);
@@ -406,7 +422,7 @@ h2.title{font-size:clamp(1.85rem,3.4vw,2.7rem);margin-bottom:16px}
   flex:none;font-size:.82rem;font-weight:600;color:var(--faint);
   letter-spacing:.02em;font-variant-numeric:tabular-nums;
 }
-.browse-page{padding:30px 0 90px}
+.browse-page{padding:24px 0 90px}
 /* the chips scroll under the count on a narrow screen, so fade the edge
    and drop the count where there is no room for it */
 .filter-bar .chip-row{
@@ -801,8 +817,7 @@ tbody tr:hover{background:var(--card-2)}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @keyframes riseIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 @media(max-width:640px){
-  .modal{animation:sheetUp .3s cubic-bezier(.22,.9,.3,1) both}
-  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+  .modal{animation:riseIn .26s cubic-bezier(.22,.9,.3,1) both}
 }
 
 /* the FAQ opens rather than snaps */
@@ -1045,15 +1060,113 @@ table.plain tr.total td{border-bottom:none;padding-top:11px;font-size:1rem}
 /* ---------- modal ---------- */
 .backdrop{
   position:fixed;inset:0;background:rgba(23,23,27,.45);backdrop-filter:blur(4px);z-index:200;
-  display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;
+  display:flex;align-items:center;justify-content:center;   /* centred, not pinned to the top */
+  padding:24px 16px;overflow-y:auto;
 }
-.modal{background:var(--card);border:1px solid var(--line-2);border-radius:20px;width:100%;max-width:560px;box-shadow:var(--shadow-lg);margin:auto 0}
+.modal{
+  background:var(--card);border:1px solid var(--line-2);border-radius:20px;
+  width:100%;max-width:560px;box-shadow:var(--shadow-lg);
+  margin:auto;                       /* stays centred, and scrolls when it is taller than the screen */
+  max-height:calc(100dvh - 48px);display:flex;flex-direction:column;
+}
+.modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:22px 24px;border-bottom:1px solid var(--line)}
 .modal-head h3{font-size:1.1rem}
 .modal-body{padding:24px}
 .modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:18px 24px;border-top:1px solid var(--line);background:var(--bg-2);border-radius:0 0 20px 20px}
 .x{background:none;border:none;font-size:1.5rem;line-height:1;color:var(--faint);cursor:pointer;padding:0 4px}
 .x:hover{color:var(--ink)}
+
+/* the poster, on the ticket itself */
+.stub-art{
+  position:relative;isolation:isolate;overflow:hidden;
+  height:168px;display:grid;place-items:center;background:var(--card-2);
+}
+.stub-art img{
+  position:relative;z-index:1;max-width:72%;max-height:140px;width:auto;height:auto;
+  object-fit:contain;border-radius:7px;box-shadow:0 8px 22px rgba(10,10,14,.34);
+}
+@media print{
+  .stub-art{height:150px;background:#fff}
+  .stub-art .ev-art-bg{display:none}
+  .stub-art img{box-shadow:none;max-height:140px}
+}
+
+/* the hero laptop on a phone: turned less, and small enough to leave room
+   for the words that do the selling */
+@media(max-width:900px){
+  .laptop{transform:rotateY(-12deg) rotateX(4deg)}
+  .laptop-wrap.shown .laptop{transform:rotateY(-8deg) rotateX(3deg)}
+}
+@media(max-width:640px){
+  .laptop-wrap{max-width:420px;margin:0 auto;perspective:900px}
+  .laptop{transform:rotateY(-14deg) rotateX(5deg) scale(.97)}
+  .laptop-wrap.shown .laptop{transform:rotateY(-10deg) rotateX(3deg) scale(.97)}
+  .laptop-screen{border-radius:11px 11px 3px 3px;padding:8px 8px 10px}
+  .laptop-screen::after{border-radius:11px 11px 3px 3px}
+  .ui{padding:12px 11px;font-size:.72rem}
+  .ui-kpis{gap:6px}
+  .float-card{font-size:.72rem;padding:8px 11px}
+  .float-card.tl{top:-10px;left:-6px}
+  .float-card.br{bottom:-10px;right:-6px}
+}
+
+/* ---------- the door scanner ---------- */
+.scan-stage{
+  position:relative;border-radius:16px;overflow:hidden;background:#000;
+  aspect-ratio:4/3;max-height:420px;
+}
+.scan-stage video{width:100%;height:100%;object-fit:cover;display:block}
+.scan-frame{position:absolute;inset:14%;pointer-events:none}
+.scan-frame i{position:absolute;width:30px;height:30px;border:3px solid rgba(255,255,255,.92);border-radius:4px}
+.scan-frame i:nth-child(1){top:0;left:0;border-right:none;border-bottom:none}
+.scan-frame i:nth-child(2){top:0;right:0;border-left:none;border-bottom:none}
+.scan-frame i:nth-child(3){bottom:0;left:0;border-right:none;border-top:none}
+.scan-frame i:nth-child(4){bottom:0;right:0;border-left:none;border-top:none}
+.scan-flash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .16s}
+.scan-flash.ok{background:rgba(15,122,58,.55);opacity:1}
+.scan-flash.bad{background:rgba(200,32,32,.55);opacity:1}
+.scan-stop{position:absolute;right:12px;bottom:12px;background:rgba(255,255,255,.92)}
+.scan-say{
+  display:flex;flex-direction:column;gap:3px;
+  border-radius:13px;padding:14px 16px;border:1px solid var(--line);background:var(--card-2);
+}
+.scan-say b{font-size:1.05rem;letter-spacing:-.01em}
+.scan-say span{font-size:.86rem;color:var(--muted)}
+.scan-say.ok{background:var(--green-soft);border-color:rgba(15,122,58,.34)}
+.scan-say.ok b{color:var(--green-deep)}
+.scan-say.warn{background:#fff6e6;border-color:rgba(200,140,20,.34)}
+.scan-say.bad{background:#fdecec;border-color:rgba(200,32,32,.3)}
+.scan-say.bad b{color:var(--red)}
+.scan-tally{display:flex;gap:18px;margin-top:12px;font-size:.85rem;color:var(--muted)}
+.scan-tally b{color:var(--ink);font-size:1.05rem;font-family:var(--display)}
+
+/* ---------- the team ---------- */
+.team-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.team-nm{font-weight:600}
+.role-pick{display:flex;flex-direction:column;gap:9px}
+.role-opt{
+  display:block;border:1px solid var(--line);border-radius:13px;padding:12px 14px;cursor:pointer;
+  transition:border-color .16s, background .16s, box-shadow .16s;
+}
+.role-opt input{position:absolute;opacity:0;pointer-events:none}
+.role-opt.on{border-color:var(--orange);background:var(--orange-soft);box-shadow:0 0 0 3px rgba(242,106,27,.14)}
+.role-nm{display:block;font-weight:700;font-size:.95rem}
+.role-sub{display:block;font-size:.8rem;color:var(--muted);margin-top:2px}
+
+/* ---------- no double-tap zoom ----------
+
+   On iOS a second tap within ~300ms zooms the page. It fires on anything
+   tappable, so a quick tap-tap on a button, a chip or a ticket stub throws
+   the layout about. touch-action:manipulation tells the browser there is no
+   double-tap gesture to wait for, which removes the zoom AND the 300ms delay
+   before a tap registers. Pinch-to-zoom is untouched — that one is the
+   reader's own choice and must never be taken away. */
+html{touch-action:manipulation}
+button, .btn, a, .chip, .tt, .ev-card, .seg button, .qty button,
+label, summary, input[type="button"], input[type="submit"], .x{
+  touch-action:manipulation;
+}
 
 /* ---------- toast ---------- */
 #toast{
@@ -1462,7 +1575,8 @@ table.plain tr.total td{border-bottom:none;padding-top:11px;font-size:1rem}
 @media print{
   .site-head,.site-foot,.no-print{display:none !important}
   body,html{background:#fff;color:#000}
-  .stub{border:1px solid #ccc;break-inside:avoid;background:#fff}
+  .stub{border:1px solid #ccc;break-inside:avoid;page-break-inside:avoid;background:#fff}
+  .stub + .stub{break-before:page;page-break-before:always}
   .stub-top{background:#f2f2f2}
   .stub-top .ev,.stub-info .val,.total-line b{color:#000}
 }
